@@ -16,6 +16,8 @@ import seaborn as sns
 from pathlib import Path
 from sklearn.metrics import classification_report, confusion_matrix
 
+from cerebrocam import config
+
 #%% ============================================================================
 # BLOCK 1: PFADE & CSV-DATEIEN LADEN
 # ==============================================================================
@@ -24,11 +26,11 @@ print("==================================================================")
 print("📊 LADE DATEN FÜR DEN FINALEN ABGLEICH")
 print("==================================================================\n")
 
-SCRIPT_DIR = Path(__file__).parent
-
-# Pfade zu den beiden CSV-Dateien (ggf. anpassen, falls sie woanders liegen)
-PREDICTIONS_CSV = SCRIPT_DIR / "inference_predictions.csv"
-MAPPING_CSV = SCRIPT_DIR / "Datensatz" / "Inferenz und Evaluierungs Daten" / "evaluation_mapping.csv"
+# Pfade aus der zentralen Konfiguration
+PREDICTIONS_CSV = config.PREDICTIONS_CSV
+MAPPING_CSV = config.EXTERNAL_MAPPING_CSV
+FIGURES_DIR = config.FIGURES_DIR
+FIGURES_DIR.mkdir(parents=True, exist_ok=True)
 
 if not PREDICTIONS_CSV.exists() or not MAPPING_CSV.exists():
     print("❌ Fehler: Eine der CSV-Dateien wurde nicht gefunden!")
@@ -75,7 +77,7 @@ y_true = merged_df['true_class']
 y_pred = merged_df['predicted_class']
 
 # Die 4 Klassennamen fest definieren (müssen exakt so heißen wie im Modell)
-class_names = ['glioma', 'meningioma', 'notumor', 'pituitary']
+class_names = config.CLASSES
 
 # Klassifikationsbericht ausgeben
 print("KLASSIFIKATIONSBERICHT (EXTERNER DATENSATZ):\n")
@@ -100,7 +102,7 @@ plt.ylabel('Tatsächliche Klasse (Realität)')
 plt.tight_layout()
 
 # Abspeichern für die Präsentation
-save_path = SCRIPT_DIR / "confusion_matrix_extern.png"
+save_path = FIGURES_DIR / "confusion_matrix_extern.png"
 plt.savefig(save_path, dpi=300)
 print(f"✅ Externe Confusion Matrix gespeichert unter: {save_path.name}")
 

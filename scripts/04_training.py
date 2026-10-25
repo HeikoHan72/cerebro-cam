@@ -16,25 +16,25 @@ from pathlib import Path
 import tensorflow as tf
 from tensorflow.keras import layers, models, callbacks
 
+from cerebrocam import config
+
 #%% ============================================================================
 # BLOCK 1: KONFIGURATION & PFADE
 # ==============================================================================
 
-# Dynamische Pfadermittlung relativ zum Speicherort des Skripts
-SCRIPT_DIR = Path(__file__).parent
-
-# Passe diesen Pfad an den Ordner an, in dem deine aufbereiteten Trainingsdaten liegen
-DATA_DIR = SCRIPT_DIR / "processed_training"
-MODEL_SAVE_PATH = SCRIPT_DIR / "cerebrocam_best_model.keras"
-HISTORY_SAVE_PATH = SCRIPT_DIR / "training_history.csv"
+# Pfade aus der zentralen Konfiguration
+DATA_DIR = config.TRAIN_PROCESSED_DIR
+MODEL_SAVE_PATH = config.MODEL_PATH
+HISTORY_SAVE_PATH = config.HISTORY_CSV
+MODEL_SAVE_PATH.parent.mkdir(parents=True, exist_ok=True)
+HISTORY_SAVE_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 # Hyperparameter
-IMG_HEIGHT = 150
-IMG_WIDTH = 150
-BATCH_SIZE = 32
-EPOCHS = 20
-VALIDATION_SPLIT = 0.2  # 80% Training, 20% Validierung
-SEED = 42
+IMG_HEIGHT, IMG_WIDTH = config.IMG_SIZE
+BATCH_SIZE = config.BATCH_SIZE
+EPOCHS = config.EPOCHS
+VALIDATION_SPLIT = config.VALIDATION_SPLIT  # 80% Training, 20% Validierung
+SEED = config.SEED
 
 #%% ============================================================================
 # BLOCK 2: DATEN LADEN & SPLITTEN
@@ -127,7 +127,7 @@ print("==================================================================\n")
 # Callbacks definieren
 early_stopping = callbacks.EarlyStopping(
     monitor='val_loss',
-    patience=5,          # Stoppt nach 5 Epochen ohne Verbesserung
+    patience=config.EARLY_STOPPING_PATIENCE,  # Stoppt nach 5 Epochen ohne Verbesserung
     restore_best_weights=True,
     verbose=1
 )

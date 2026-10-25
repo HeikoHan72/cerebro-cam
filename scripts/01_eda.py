@@ -18,13 +18,15 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# Ermittelt exakt den Ordner, in dem 01_EDA.py gespeichert ist
-BASE_DIR = Path(__file__).parent.resolve()
+from cerebrocam import config
 
-TRAIN_DIR = BASE_DIR / "training"
-TEST_DIR = BASE_DIR / "testing"  # <--- HIER WAR DER FEHLER (jetzt 'testing')
+# Pfade und Klassen aus der zentralen Konfiguration
+TRAIN_DIR = config.TRAIN_RAW_DIR
+TEST_DIR = config.TEST_RAW_DIR
+FIGURES_DIR = config.FIGURES_DIR
+FIGURES_DIR.mkdir(parents=True, exist_ok=True)
 
-CLASSES = ["glioma", "meningioma", "notumor", "pituitary"]
+CLASSES = config.CLASSES
 
 #%% ============================================================================
 # BLOCK 2: PFADPRÜFUNG
@@ -38,8 +40,8 @@ def check_paths():
     
     if not TRAIN_DIR.exists() or not TEST_DIR.exists():
         raise FileNotFoundError(
-            "❌ Ordner 'training' oder 'test' nicht gefunden!\n"
-            "Stelle sicher, dass Spyder den Ordner des Skripts als Working Directory nutzt."
+            f"❌ Datenordner nicht gefunden: {TRAIN_DIR} / {TEST_DIR}\n"
+            "Bitte zuerst scripts/00_setup_data.py ausführen."
         )
         
     print("✅ Ordner 'training' gefunden.")
@@ -153,7 +155,7 @@ def plot_distributions(train_counts, test_counts):
         ax[1].text(i, v + (max(test_counts.values()) * 0.02), str(v), ha='center', fontweight='bold')
         
     plt.tight_layout()
-    plt.savefig("eda_class_distribution.png", dpi=300)
+    plt.savefig(FIGURES_DIR / "eda_class_distribution.png", dpi=300)
     plt.show()
     print("✅ Diagramm 'eda_class_distribution.png' gespeichert.\n")
 
@@ -184,7 +186,7 @@ def plot_sample_grid(data_dir: Path, samples_per_class=4):
             ax.axis("off")
             
     plt.tight_layout()
-    plt.savefig("eda_sample_grid.png", dpi=300)
+    plt.savefig(FIGURES_DIR / "eda_sample_grid.png", dpi=300)
     plt.show()
     print("✅ Beispiel-Grid 'eda_sample_grid.png' gespeichert.\n")
 

@@ -14,14 +14,16 @@ from pathlib import Path
 from PIL import Image
 import csv
 
-# Exakter Quellpfad
-SRC_DIR = Path("/media/h/AI Engineer Study/AI Engineer - Weiterbildung/01_AI Engineer Lehrgang/01_Module Lehrgang/03_Deep Learning/01_Module/5. Woche - Deep Learning Projektwoche/Projektarbeit - CerebroCAM/Datensatz/Inferenz und Evaluierungs Daten")
+from cerebrocam import config
 
-# Zielordner exakt nach Vorgabe: "Unklassifiziert"
-DEST_DIR = SRC_DIR / "Unklassifiziert"
+# Quellordner: externer Datensatz (Sartaj), eingerichtet durch 00_setup_data.py
+SRC_DIR = config.SARTAJ_DIR
+
+# Zielordner für die anonymisierten Bilder
+DEST_DIR = config.EXTERNAL_UNLABELED_DIR
 
 # Pfad für die Mapping-CSV-Datei zur späteren Kontrolle
-MAPPING_CSV = SRC_DIR / "evaluation_mapping.csv"
+MAPPING_CSV = config.EXTERNAL_MAPPING_CSV
 
 
 def process_and_create_mapping():
@@ -64,7 +66,7 @@ def process_and_create_mapping():
             # Bild öffnen, in RGB konvertieren und auf 150x150 skalieren
             with Image.open(img_path) as img:
                 img_rgb = img.convert("RGB")
-                img_resized = img_rgb.resize((150, 150), Image.Resampling.LANCZOS)
+                img_resized = img_rgb.resize(config.IMG_SIZE, Image.Resampling.LANCZOS)
                 img_resized.save(dest_path)
                 
             # Mapping-Eintrag für die spätere Kontrolle erfassen

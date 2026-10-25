@@ -14,17 +14,17 @@ Created on Mon Aug 10 14:32:13 2026
 from pathlib import Path
 from PIL import Image
 
-# Ermittelt exakt den Ordner, in dem das Skript liegt
-BASE_DIR = Path(__file__).parent.resolve()
+from cerebrocam import config
 
-SRC_TRAIN = BASE_DIR / "training"
-SRC_TEST = BASE_DIR / "testing"
+# Quell- und Zielordner aus der zentralen Konfiguration
+SRC_TRAIN = config.TRAIN_RAW_DIR
+SRC_TEST = config.TEST_RAW_DIR
 
-DEST_TRAIN = BASE_DIR / "processed_training"
-DEST_TEST = BASE_DIR / "processed_testing"
+DEST_TRAIN = config.TRAIN_PROCESSED_DIR
+DEST_TEST = config.TEST_PROCESSED_DIR
 
-CLASSES = ["glioma", "meningioma", "notumor", "pituitary"]
-IMG_SIZE = (150, 150)
+CLASSES = config.CLASSES
+IMG_SIZE = config.IMG_SIZE
 
 
 #%% ============================================================================
@@ -57,7 +57,7 @@ def process_and_save_images(src_root: Path, dest_root: Path):
                     
                     # Physisch auf der Festplatte speichern (als JPEG)
                     dest_path = dest_cls_dir / f"{img_path.stem}.jpg"
-                    img_resized.save(dest_path, "JPEG", quality=95)
+                    img_resized.save(dest_path, "JPEG", quality=config.JPEG_QUALITY)
             except Exception as e:
                 print(f"    ❌ Fehler bei {img_path.name}: {e}")
                 

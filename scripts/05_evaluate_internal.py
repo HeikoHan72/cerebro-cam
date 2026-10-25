@@ -18,6 +18,8 @@ from pathlib import Path
 import tensorflow as tf
 from sklearn.metrics import classification_report, confusion_matrix
 
+from cerebrocam import config
+
 #%% ============================================================================
 # BLOCK 1: PFADE & LERNKURVEN PLOTTEN
 # ==============================================================================
@@ -26,10 +28,11 @@ print("==================================================================")
 print("📊 ERSTELLE LERNKURVEN FÜR DIE DOKUMENTATION")
 print("==================================================================\n")
 
-SCRIPT_DIR = Path(__file__).parent
-TEST_DIR = SCRIPT_DIR / "processed_testing"
-MODEL_PATH = SCRIPT_DIR / "cerebrocam_best_model.keras"
-HISTORY_PATH = SCRIPT_DIR / "training_history.csv"
+TEST_DIR = config.TEST_PROCESSED_DIR
+MODEL_PATH = config.MODEL_PATH
+HISTORY_PATH = config.HISTORY_CSV
+FIGURES_DIR = config.FIGURES_DIR
+FIGURES_DIR.mkdir(parents=True, exist_ok=True)
 
 # Historie laden
 if HISTORY_PATH.exists():
@@ -59,7 +62,7 @@ if HISTORY_PATH.exists():
     plt.grid(True)
     
     plt.tight_layout()
-    plt.savefig(SCRIPT_DIR / "lernkurven.png", dpi=300)
+    plt.savefig(FIGURES_DIR / "lernkurven.png", dpi=300)
     print("✅ Lernkurven wurden als 'lernkurven.png' gespeichert.")
     plt.show()
 else:
@@ -77,8 +80,8 @@ print("==================================================================\n")
 # mit den Modellvorhersagen in der gleichen Reihenfolge bleiben!
 test_dataset = tf.keras.utils.image_dataset_from_directory(
     TEST_DIR,
-    image_size=(150, 150),
-    batch_size=32,
+    image_size=config.IMG_SIZE,
+    batch_size=config.BATCH_SIZE,
     label_mode='categorical',
     shuffle=False 
 )
@@ -124,6 +127,6 @@ plt.title('Confusion Matrix - Interner Testdatensatz')
 plt.xlabel('Vorhergesagte Klasse (KI)')
 plt.ylabel('Tatsächliche Klasse (Realität)')
 plt.tight_layout()
-plt.savefig(SCRIPT_DIR / "confusion_matrix.png", dpi=300)
+plt.savefig(FIGURES_DIR / "confusion_matrix.png", dpi=300)
 print("\n✅ Confusion Matrix wurde als 'confusion_matrix.png' gespeichert.")
 plt.show()

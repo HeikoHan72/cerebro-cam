@@ -16,6 +16,8 @@ from pathlib import Path
 import tensorflow as tf
 from tensorflow.keras.preprocessing import image
 
+from cerebrocam import config
+
 #%% ============================================================================
 # BLOCK 1: PFADE & KONFIGURATION
 # ==============================================================================
@@ -24,19 +26,18 @@ print("==================================================================")
 print("⚙️ INITIALISIERE INFERENZ-UMGEBUNG")
 print("==================================================================\n")
 
-SCRIPT_DIR = Path(__file__).parent
-
-# Passe diesen Pfad an, falls dein "Unklassifiziert"-Ordner woanders liegt
-INFERENCE_DIR = SCRIPT_DIR / "Datensatz" / "Inferenz und Evaluierungs Daten" / "Unklassifiziert"
-MODEL_PATH = SCRIPT_DIR / "cerebrocam_best_model.keras"
-PREDICTIONS_CSV = SCRIPT_DIR / "inference_predictions.csv"
+# Pfade aus der zentralen Konfiguration
+INFERENCE_DIR = config.EXTERNAL_UNLABELED_DIR
+MODEL_PATH = config.MODEL_PATH
+PREDICTIONS_CSV = config.PREDICTIONS_CSV
+PREDICTIONS_CSV.parent.mkdir(parents=True, exist_ok=True)
 
 # Die genauen Klassennamen in alphabetischer Reihenfolge (wie beim Training)
-CLASS_NAMES = ['glioma', 'meningioma', 'notumor', 'pituitary']
+CLASS_NAMES = config.CLASSES
 
 if not INFERENCE_DIR.exists():
     print(f"❌ Fehler: Der Inferenz-Ordner wurde nicht gefunden:\n{INFERENCE_DIR}")
-    print("Bitte den Pfad in Block 1 anpassen.")
+    print("Bitte zuerst scripts/06_prepare_external_data.py ausführen.")
     exit()
 
 #%% ============================================================================
@@ -65,7 +66,7 @@ counter = 0
 for img_path in image_paths:
     try:
         # Bild laden und auf die beim Training verwendete Größe (150x150) anpassen
-        img = image.load_img(img_path, target_size=(150, 150))
+        img = image.load_img(img_path, target_size=config.IMG_SIZE)
         
         # Bild in ein Numpy-Array umwandeln
         img_array = image.img_to_array(img)
