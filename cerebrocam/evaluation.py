@@ -40,6 +40,65 @@ def metrics_by_subset(df: pd.DataFrame, subsets: dict, labels: list[str]) -> dic
     }
 
 
+def label_internal_predictions(predictions: pd.DataFrame, manifest_csv: Path) -> pd.DataFrame:
+    """Ergaenzt Vorhersagen fuer den internen Testsatz um wahre Klasse und Duplikat-Status.
+
+    predictions: Spalten 'file' (z. B. 'glioma/Te-gl_1.jpg'), 'predicted_class', 'confidence'.
+    Die wahre Klasse ist der Ordnername; 'keep' und 'reason' stammen aus dem Manifest (Skript 02).
+    """
+    df = predictions.copy()
+    df["true_class"] = df["file"].str.split("/").str[0]
+    df["key"] = df["file"].str.rsplit(".", n=1).str[0]
+
+    manifest = pd.read_csv(manifest_csv)
+    manifest = manifest[manifest["split"] == "Testing"].copy()
+    # 'Testing/glioma/Te-gl_1.jpg' -> 'glioma/Te-gl_1' (vorverarbeitete Bilder enden immer auf .jpg)
+    manifest["key"] = manifest["file"].str.split("/", n=1).str[1].str.rsplit(".", n=1).str[0]
+
+    df = df.merge(manifest[["key", "keep", "reason"]], on="key", how="left", validate="one_to_one")
+    if df["keep"].isna().any():
+        raise ValueError(
+            "Nicht alle Testbilder stehen im Manifest. Bitte die Skripte 02 und 03 erneut ausfuehren."
+        )
+    df["keep"] = df["keep"].astype(bool)
+    return df.drop(columns="key")
+
+
+def internal_subsets(df: pd.DataFrame) -> dict:
+    """Offizieller Testsatz (alle Bilder) und bereinigter Testsatz (ohne Duplikate)."""
+    return {"official_test": pd.Series(True, index=df.index), "deduplicated_test": df["keep"]}
+
+
+def label_external_predictions(
+    predictions: pd.DataFrame, mapping_csv: Path, overlap_csv: Path, label_map: dict
+) -> pd.DataFrame:
+    """Entblindet die externen Vorhersagen und ergaenzt die Ueberlappung mit dem Training.
+
+    predictions: Spalten 'new_filename', 'predicted_class', 'confidence' (Skript 07).
+    """
+    mapping = pd.read_csv(mapping_csv)
+    overlap = pd.read_csv(overlap_csv)
+    df = predictions.merge(mapping, on="new_filename", how="inner", validate="one_to_one")
+    df = df.merge(
+        overlap[["original_path", "category", "eval_not_in_training"]],
+        on="original_path",
+        how="left",
+        validate="one_to_one",
+    )
+    if len(df) != len(mapping) or df["category"].isna().any():
+        raise ValueError("Nicht alle externen Bilder konnten zugeordnet werden (Skripte 02, 06, 07 pruefen).")
+    df["true_class"] = df["true_class"].map(label_map)
+    if df["true_class"].isna().any():
+        raise ValueError("Unbekannte Klassennamen in der Mapping-Tabelle.")
+    df["eval_not_in_training"] = df["eval_not_in_training"].astype(bool)
+    return df
+
+
+def external_subsets(df: pd.DataFrame) -> dict:
+    """Alle externen Bilder und nur die, die nicht (nahezu) identisch im Training vorkommen."""
+    return {"all": pd.Series(True, index=df.index), "not_in_training": df["eval_not_in_training"]}
+
+
 def save_json(obj: dict, path: Path) -> None:
     """Speichert ein Dictionary als lesbare JSON-Datei."""
     path.parent.mkdir(parents=True, exist_ok=True)

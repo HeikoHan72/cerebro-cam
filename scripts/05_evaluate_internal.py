@@ -15,7 +15,6 @@ wie stark Duplikate das Ergebnis beschoenigen.
 # BLOCK 1: PFADE & LERNKURVEN
 # ==============================================================================
 
-from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -25,7 +24,13 @@ from matplotlib.ticker import MaxNLocator
 from sklearn.metrics import classification_report
 
 from cerebrocam import config
-from cerebrocam.evaluation import metrics_by_subset, plot_confusion_matrix, save_json
+from cerebrocam.evaluation import (
+    internal_subsets,
+    label_internal_predictions,
+    metrics_by_subset,
+    plot_confusion_matrix,
+    save_json,
+)
 from cerebrocam.inference import predict_folder
 
 TEST_DIR = config.TEST_PROCESSED_DIR
@@ -77,32 +82,16 @@ if not config.NICKPARVAR_MANIFEST_CSV.exists():
 model = tf.keras.models.load_model(config.MODEL_PATH)
 print(f"Modell geladen: {config.MODEL_PATH}")
 
-# Vorhersagen fuer alle Testbilder; die wahre Klasse ist der Ordnername
-predictions = predict_folder(model, TEST_DIR)
-predictions["true_class"] = predictions["file"].str.split("/").str[0]
-
-# Ergebnis des Duplikat-Checks anbinden (Schluessel: Klasse/Dateiname ohne Endung)
-manifest = pd.read_csv(config.NICKPARVAR_MANIFEST_CSV)
-manifest = manifest[manifest["split"] == "Testing"].copy()
-manifest["key"] = manifest["class"] + "/" + manifest["file"].map(lambda f: Path(f).stem)
-predictions["key"] = predictions["file"].map(lambda f: str(Path(f).with_suffix("")))
-predictions = predictions.merge(
-    manifest[["key", "keep", "reason"]], on="key", how="left", validate="one_to_one"
-)
-if predictions["keep"].isna().any():
-    raise ValueError("Nicht alle Testbilder stehen im Manifest. Bitte Skript 02 und 03 erneut ausfuehren.")
-predictions["keep"] = predictions["keep"].astype(bool)
-predictions.drop(columns="key").to_csv(config.PREDICTIONS_INTERNAL_CSV, index=False)
+# Vorhersagen fuer alle Testbilder, ergaenzt um wahre Klasse und Duplikat-Status (Skript 02)
+predictions = label_internal_predictions(predict_folder(model, TEST_DIR), config.NICKPARVAR_MANIFEST_CSV)
+predictions.to_csv(config.PREDICTIONS_INTERNAL_CSV, index=False)
 
 # %% ============================================================================
 # BLOCK 3: KENNZAHLEN & KONFUSIONSMATRIZEN
 # ==============================================================================
 
 class_names = config.CLASSES
-subsets = {
-    "official_test": pd.Series(True, index=predictions.index),
-    "deduplicated_test": predictions["keep"],
-}
+subsets = internal_subsets(predictions)
 metrics = metrics_by_subset(predictions, subsets, class_names)
 save_json(metrics, config.METRICS_INTERNAL_JSON)
 

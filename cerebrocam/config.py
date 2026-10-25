@@ -36,6 +36,7 @@ EXTERNAL_MAPPING_CSV = EXTERNAL_DIR / "evaluation_mapping.csv"
 # ---------------------------------------------------------------------------
 MODELS_DIR = PROJECT_ROOT / "models"
 MODEL_PATH = MODELS_DIR / "cerebrocam_best_model.keras"
+ORIGINAL_MODEL_PATH = MODELS_DIR / "original_model.keras"  # Modell aus der Projektwoche (August 2026)
 
 RESULTS_DIR = PROJECT_ROOT / "results"
 FIGURES_DIR = RESULTS_DIR / "figures"
@@ -45,6 +46,8 @@ PREDICTIONS_INTERNAL_CSV = RESULTS_DIR / "predictions_internal.csv"
 PREDICTIONS_EXTERNAL_CSV = RESULTS_DIR / "predictions_external.csv"
 METRICS_INTERNAL_JSON = RESULTS_DIR / "metrics_internal.json"
 METRICS_EXTERNAL_JSON = RESULTS_DIR / "metrics_external.json"
+ORIGINAL_RESULTS_DIR = RESULTS_DIR / "original"
+METRICS_ORIGINAL_MODEL_JSON = ORIGINAL_RESULTS_DIR / "metrics_original_model.json"
 
 # Ergebnisse des Duplikat-Checks (Skript 02); werden mit ins Repository aufgenommen
 DUPLICATES_DIR = RESULTS_DIR / "duplicates"
