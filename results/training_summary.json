@@ -1,0 +1,23 @@
+{
+  "epochs_run": 13,
+  "best_epoch": 8,
+  "best_val_loss": 0.20906582474708557,
+  "val_accuracy_at_best_epoch": 0.9296793937683105,
+  "train_accuracy_at_best_epoch": 0.9586456418037415,
+  "training_images_per_class": {
+    "glioma": 1392,
+    "meningioma": 1369,
+    "notumor": 729,
+    "pituitary": 1346
+  },
+  "class_weights": {
+    "glioma": 0.8685,
+    "meningioma": 0.8831,
+    "notumor": 1.6584,
+    "pituitary": 0.8982
+  },
+  "seed": 42,
+  "python": "3.13.13",
+  "tensorflow": "2.21.0",
+  "keras": "3.15.0"
+}
