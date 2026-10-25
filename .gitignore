@@ -1,0 +1,31 @@
+# Data (downloaded from Kaggle, not redistributed)
+Datensatz/
+training/
+testing/
+processed_training/
+processed_testing/
+*.zip
+
+# Trained models (published as release assets)
+*.keras
+*.h5
+
+# Mapping file contains local absolute paths
+evaluation_mapping.csv
+
+# Python / IDE
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.spyproject/
+.venv/
+venv/
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Other
+*.exe
+*.odt
