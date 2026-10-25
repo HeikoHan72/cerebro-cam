@@ -1,0 +1,71 @@
+{
+  "max_distance_identical": 2,
+  "max_distance_gray_zone": 8,
+  "training": {
+    "original": {
+      "glioma": 1400,
+      "meningioma": 1400,
+      "notumor": 1400,
+      "pituitary": 1400
+    },
+    "kept": {
+      "glioma": 1392,
+      "meningioma": 1369,
+      "notumor": 729,
+      "pituitary": 1346
+    }
+  },
+  "test": {
+    "original": {
+      "glioma": 400,
+      "meningioma": 400,
+      "notumor": 400,
+      "pituitary": 400
+    },
+    "duplicate_of_training_image": {
+      "glioma": 9,
+      "meningioma": 106,
+      "notumor": 321,
+      "pituitary": 3
+    },
+    "kept": {
+      "glioma": 373,
+      "meningioma": 292,
+      "notumor": 51,
+      "pituitary": 396
+    }
+  },
+  "external": {
+    "total": {
+      "glioma": 926,
+      "meningioma": 937,
+      "notumor": 500,
+      "pituitary": 901
+    },
+    "identical_to_training": {
+      "glioma": 240,
+      "meningioma": 865,
+      "notumor": 490,
+      "pituitary": 810
+    },
+    "gray_zone": {
+      "glioma": 155,
+      "meningioma": 25,
+      "notumor": 0,
+      "pituitary": 63
+    },
+    "new": {
+      "glioma": 531,
+      "meningioma": 47,
+      "notumor": 10,
+      "pituitary": 28
+    },
+    "byte_identical_to_training": 2257,
+    "unique_not_in_training": {
+      "glioma": 652,
+      "meningioma": 67,
+      "notumor": 7,
+      "pituitary": 80
+    }
+  }
+}

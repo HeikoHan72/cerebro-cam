@@ -20,6 +20,7 @@ from tensorflow import keras
 from tensorflow.keras import callbacks
 
 from cerebrocam import config
+from cerebrocam.data import list_images
 from cerebrocam.evaluation import save_json
 from cerebrocam.model import build_model
 
@@ -63,6 +64,18 @@ if class_names != config.CLASSES:
     raise ValueError(f"Unerwartete Klassen: {class_names}")
 print(f"\nGefundene Klassen: {class_names}\n")
 
+# Klassengewichte: seltenere Klassen zaehlen im Loss staerker (Gewicht = N / (K * N_Klasse)).
+# Nach der Duplikat-Bereinigung bleiben deutlich weniger notumor-Bilder uebrig.
+image_counts = {c: len(list_images(DATA_DIR / c)) for c in class_names}
+if config.USE_CLASS_WEIGHTS:
+    total = sum(image_counts.values())
+    class_weight = {i: total / (len(class_names) * image_counts[c]) for i, c in enumerate(class_names)}
+else:
+    class_weight = None
+print(f"Bilder pro Klasse: {image_counts}")
+if class_weight:
+    print("Klassengewichte: " + ", ".join(f"{c}: {class_weight[i]:.3f}" for i, c in enumerate(class_names)))
+
 AUTOTUNE = tf.data.AUTOTUNE
 train_dataset = train_dataset.cache().shuffle(1000, seed=config.SEED).prefetch(buffer_size=AUTOTUNE)
 val_dataset = val_dataset.cache().prefetch(buffer_size=AUTOTUNE)
@@ -102,6 +115,7 @@ history = model.fit(
     validation_data=val_dataset,
     epochs=config.EPOCHS,
     callbacks=[early_stopping, model_checkpoint],
+    class_weight=class_weight,
 )
 
 # %% ============================================================================
@@ -119,6 +133,10 @@ summary = {
     "best_val_loss": float(hist_df.loc[best_epoch, "val_loss"]),
     "val_accuracy_at_best_epoch": float(hist_df.loc[best_epoch, "val_accuracy"]),
     "train_accuracy_at_best_epoch": float(hist_df.loc[best_epoch, "accuracy"]),
+    "training_images_per_class": image_counts,  # inkl. 20 % Validierung
+    "class_weights": {c: round(class_weight[i], 4) for i, c in enumerate(class_names)}
+    if class_weight
+    else None,
     "seed": config.SEED,
     "python": platform.python_version(),
     "tensorflow": tf.__version__,

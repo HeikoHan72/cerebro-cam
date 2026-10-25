@@ -46,6 +46,12 @@ PREDICTIONS_EXTERNAL_CSV = RESULTS_DIR / "predictions_external.csv"
 METRICS_INTERNAL_JSON = RESULTS_DIR / "metrics_internal.json"
 METRICS_EXTERNAL_JSON = RESULTS_DIR / "metrics_external.json"
 
+# Ergebnisse des Duplikat-Checks (Skript 02); werden mit ins Repository aufgenommen
+DUPLICATES_DIR = RESULTS_DIR / "duplicates"
+NICKPARVAR_MANIFEST_CSV = DUPLICATES_DIR / "nickparvar_manifest.csv"
+EXTERNAL_OVERLAP_CSV = DUPLICATES_DIR / "external_overlap.csv"
+DUPLICATES_SUMMARY_JSON = DUPLICATES_DIR / "summary.json"
+
 # ---------------------------------------------------------------------------
 # Klassen (alphabetisch, so wie Keras sie aus den Ordnernamen liest)
 # ---------------------------------------------------------------------------
@@ -69,6 +75,14 @@ EPOCHS = 20
 VALIDATION_SPLIT = 0.2
 SEED = 42
 EARLY_STOPPING_PATIENCE = 5
+USE_CLASS_WEIGHTS = True  # gleicht aus, dass nach der Bereinigung weniger notumor-Bilder bleiben
+
+# ---------------------------------------------------------------------------
+# Duplikat-Erkennung (Distanz = max(Hamming pHash, Hamming dHash), 64-Bit-Hashes)
+# Die Schwellen wurden per Sichtpruefung von Bildpaaren festgelegt.
+# ---------------------------------------------------------------------------
+DUPLICATE_MAX_DISTANCE = 2  # <= 2: dasselbe Bild (ggf. anders komprimiert oder kontrastiert)
+GRAY_ZONE_MAX_DISTANCE = 8  # 3-8: meist benachbarte Schicht desselben Patienten
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp"}
 

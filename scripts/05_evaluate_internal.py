@@ -3,7 +3,12 @@
 SKRIPT 05: INTERNE EVALUIERUNG (Lernkurven & Konfusionsmatrix)
 
 Bewertet das trainierte Modell auf dem zurueckgehaltenen Testdatensatz
-(Nickparvar 'Testing') und speichert Kennzahlen, Vorhersagen und Abbildungen.
+(Nickparvar 'Testing') in zwei Varianten:
+  - official_test:     alle 1600 Testbilder der offiziellen Aufteilung
+  - deduplicated_test: ohne Bilder, die (nahezu) identisch im Training vorkommen,
+                       und ohne Duplikate innerhalb des Testsatzes (Skript 02)
+Die bereinigte Variante ist die massgebliche Kennzahl; die offizielle zeigt,
+wie stark Duplikate das Ergebnis beschoenigen.
 """
 
 # %% ============================================================================
@@ -20,7 +25,8 @@ from matplotlib.ticker import MaxNLocator
 from sklearn.metrics import classification_report
 
 from cerebrocam import config
-from cerebrocam.evaluation import compute_metrics, plot_confusion_matrix, save_json
+from cerebrocam.evaluation import metrics_by_subset, plot_confusion_matrix, save_json
+from cerebrocam.inference import predict_folder
 
 TEST_DIR = config.TEST_PROCESSED_DIR
 FIGURES_DIR = config.FIGURES_DIR
@@ -63,46 +69,57 @@ print("\n==================================================================")
 print("VORHERSAGEN AUF DEM INTERNEN TESTDATENSATZ")
 print("==================================================================\n")
 
-# shuffle=False ist zwingend: nur so passen Vorhersagen und echte Labels zusammen
-test_dataset = tf.keras.utils.image_dataset_from_directory(
-    TEST_DIR,
-    image_size=config.IMG_SIZE,
-    batch_size=config.BATCH_SIZE,
-    label_mode="categorical",
-    shuffle=False,
-)
-class_names = test_dataset.class_names
+if not config.NICKPARVAR_MANIFEST_CSV.exists():
+    raise FileNotFoundError(
+        f"Manifest nicht gefunden: {config.NICKPARVAR_MANIFEST_CSV}. Bitte Skript 02 ausfuehren."
+    )
 
 model = tf.keras.models.load_model(config.MODEL_PATH)
 print(f"Modell geladen: {config.MODEL_PATH}")
 
-probabilities = model.predict(test_dataset, verbose=0)
-y_pred_idx = np.argmax(probabilities, axis=1)
-y_true_idx = np.argmax(np.concatenate([y for _, y in test_dataset], axis=0), axis=1)
-y_true = [class_names[i] for i in y_true_idx]
-y_pred = [class_names[i] for i in y_pred_idx]
+# Vorhersagen fuer alle Testbilder; die wahre Klasse ist der Ordnername
+predictions = predict_folder(model, TEST_DIR)
+predictions["true_class"] = predictions["file"].str.split("/").str[0]
 
-predictions = pd.DataFrame({
-    "file": [str(Path(p).relative_to(TEST_DIR)) for p in test_dataset.file_paths],
-    "true_class": y_true,
-    "predicted_class": y_pred,
-    "confidence": probabilities.max(axis=1).round(4),
-})
-predictions.to_csv(config.PREDICTIONS_INTERNAL_CSV, index=False)
+# Ergebnis des Duplikat-Checks anbinden (Schluessel: Klasse/Dateiname ohne Endung)
+manifest = pd.read_csv(config.NICKPARVAR_MANIFEST_CSV)
+manifest = manifest[manifest["split"] == "Testing"].copy()
+manifest["key"] = manifest["class"] + "/" + manifest["file"].map(lambda f: Path(f).stem)
+predictions["key"] = predictions["file"].map(lambda f: str(Path(f).with_suffix("")))
+predictions = predictions.merge(
+    manifest[["key", "keep", "reason"]], on="key", how="left", validate="one_to_one"
+)
+if predictions["keep"].isna().any():
+    raise ValueError("Nicht alle Testbilder stehen im Manifest. Bitte Skript 02 und 03 erneut ausfuehren.")
+predictions["keep"] = predictions["keep"].astype(bool)
+predictions.drop(columns="key").to_csv(config.PREDICTIONS_INTERNAL_CSV, index=False)
 
 # %% ============================================================================
-# BLOCK 3: KENNZAHLEN & KONFUSIONSMATRIX
+# BLOCK 3: KENNZAHLEN & KONFUSIONSMATRIZEN
 # ==============================================================================
 
-print("KLASSIFIKATIONSBERICHT (INTERNER TESTDATENSATZ):\n")
-print(classification_report(y_true, y_pred, labels=class_names, digits=3))
-
-metrics = compute_metrics(y_true, y_pred, class_names)
+class_names = config.CLASSES
+subsets = {
+    "official_test": pd.Series(True, index=predictions.index),
+    "deduplicated_test": predictions["keep"],
+}
+metrics = metrics_by_subset(predictions, subsets, class_names)
 save_json(metrics, config.METRICS_INTERNAL_JSON)
 
-plot_confusion_matrix(metrics["confusion_matrix"], class_names, "Confusion matrix - internal test set",
-                      FIGURES_DIR / "confusion_matrix_internal.png", cmap="Blues")
+for name, mask in subsets.items():
+    sub = predictions[mask]
+    print(f"KLASSIFIKATIONSBERICHT - {name} ({len(sub)} Bilder):\n")
+    print(classification_report(sub["true_class"], sub["predicted_class"], labels=class_names, digits=3))
+    out = FIGURES_DIR / f"confusion_matrix_internal_{name.removesuffix('_test')}.png"
+    plot_confusion_matrix(
+        metrics[name]["confusion_matrix"],
+        class_names,
+        f"Confusion matrix - internal {name.replace('_', ' ')} (n={len(sub)})",
+        out,
+        cmap="Blues",
+    )
 
-print(f"Kennzahlen gespeichert:   {config.METRICS_INTERNAL_JSON}")
-print(f"Vorhersagen gespeichert:  {config.PREDICTIONS_INTERNAL_CSV}")
-print(f"Konfusionsmatrix:         {FIGURES_DIR / 'confusion_matrix_internal.png'}")
+print(f"Accuracy offizieller Testsatz:  {metrics['official_test']['accuracy']:.4f}")
+print(f"Accuracy bereinigter Testsatz: {metrics['deduplicated_test']['accuracy']:.4f}")
+print(f"Kennzahlen gespeichert:  {config.METRICS_INTERNAL_JSON}")
+print(f"Vorhersagen gespeichert: {config.PREDICTIONS_INTERNAL_CSV}")

@@ -5,6 +5,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import seaborn as sns
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 
@@ -28,6 +29,14 @@ def compute_metrics(y_true, y_pred, labels: list[str]) -> dict:
         "macro_avg": {k: float(report["macro avg"][k]) for k in ("precision", "recall", "f1-score")},
         "labels": list(labels),
         "confusion_matrix": cm.tolist(),
+    }
+
+
+def metrics_by_subset(df: pd.DataFrame, subsets: dict, labels: list[str]) -> dict:
+    """Kennzahlen fuer mehrere Teilmengen; df braucht die Spalten true_class und predicted_class."""
+    return {
+        name: compute_metrics(df.loc[mask, "true_class"], df.loc[mask, "predicted_class"], labels)
+        for name, mask in subsets.items()
     }
 
 
