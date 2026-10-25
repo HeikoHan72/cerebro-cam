@@ -1,110 +1,61 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
-Created on Tue Aug 11 12:48:06 2026
+SKRIPT 08: EXTERNE EVALUIERUNG (Entblindung)
 
-@author: h
+Fuehrt die Vorhersagen aus Skript 07 mit der Mapping-Tabelle aus Skript 06
+zusammen und berechnet die Kennzahlen auf dem externen Datensatz.
 """
 
-#%% ============================================================================
-# SCRIPT 07: EXTERNE EVALUIERUNG (Der finale Proof)
+# %% ============================================================================
+# BLOCK 1: PFADE & DATEN LADEN
 # ==============================================================================
 
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-from pathlib import Path
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import classification_report
 
 from cerebrocam import config
+from cerebrocam.evaluation import compute_metrics, plot_confusion_matrix, save_json
 
-#%% ============================================================================
-# BLOCK 1: PFADE & CSV-DATEIEN LADEN
+for path in (config.PREDICTIONS_EXTERNAL_CSV, config.EXTERNAL_MAPPING_CSV):
+    if not path.exists():
+        raise FileNotFoundError(
+            f"Datei nicht gefunden: {path}. Bitte zuerst die Skripte 06 und 07 ausfuehren."
+        )
+
+preds_df = pd.read_csv(config.PREDICTIONS_EXTERNAL_CSV)
+mapping_df = pd.read_csv(config.EXTERNAL_MAPPING_CSV)
+
+# Zusammenfuehren ueber den anonymen Dateinamen; jede Datei muss genau einmal passen
+merged_df = pd.merge(preds_df, mapping_df, on="new_filename", how="inner", validate="one_to_one")
+if len(merged_df) != len(mapping_df):
+    raise ValueError(f"Nur {len(merged_df)} von {len(mapping_df)} Bildern konnten zugeordnet werden.")
+print(f"{len(merged_df)} Bilder abgeglichen.")
+
+# %% ============================================================================
+# BLOCK 2: LABELS VEREINHEITLICHEN & KENNZAHLEN
+# Die Ordnernamen des externen Datensatzes (z. B. 'glioma_tumor') werden auf
+# die Klassennamen des Modells abgebildet.
 # ==============================================================================
 
-print("==================================================================")
-print("📊 LADE DATEN FÜR DEN FINALEN ABGLEICH")
-print("==================================================================\n")
+merged_df["true_class"] = merged_df["true_class"].map(config.SARTAJ_LABEL_MAP)
+if merged_df["true_class"].isna().any():
+    raise ValueError("Unbekannte Klassennamen in der Mapping-Tabelle.")
 
-# Pfade aus der zentralen Konfiguration
-PREDICTIONS_CSV = config.PREDICTIONS_CSV
-MAPPING_CSV = config.EXTERNAL_MAPPING_CSV
-FIGURES_DIR = config.FIGURES_DIR
-FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-
-if not PREDICTIONS_CSV.exists() or not MAPPING_CSV.exists():
-    print("❌ Fehler: Eine der CSV-Dateien wurde nicht gefunden!")
-    print(f"Suche Vorhersagen unter: {PREDICTIONS_CSV}")
-    print(f"Suche Mapping unter: {MAPPING_CSV}")
-    exit()
-
-# Einlesen der CSV-Dateien mit pandas
-preds_df = pd.read_csv(PREDICTIONS_CSV)
-mapping_df = pd.read_csv(MAPPING_CSV)
-
-# Zusammenführen (Merge) anhand des anonymen Dateinamens ('new_filename')
-merged_df = pd.merge(preds_df, mapping_df, on='new_filename')
-
-print(f"• Erfolgreich {len(merged_df)} Bilder abgeglichen.")
-
-#%% ============================================================================
-# BLOCK 2: METRIKEN BERECHNEN & AUSGEBEN
-# ==============================================================================
-
-print("\n==================================================================")
-print("📈 ERGEBNISSE DER EXTERNEN VALIDIERUNG")
-print("==================================================================\n")
-
-# Wir standardisieren die echten Labels aus den Ordnernamen des fremden Datensatzes, 
-# damit sie exakt zu den Vorhersagen (Klassen) unseres Modells passen.
-label_mapping = {
-    'glioma_tumor': 'glioma',
-    'meningioma_tumor': 'meningioma',
-    'no_tumor': 'notumor',
-    'pituitary_tumor': 'pituitary',
-    # Fallbacks, falls die Namen schon teilweise stimmen:
-    'glioma': 'glioma',
-    'meningioma': 'meningioma',
-    'notumor': 'notumor',
-    'pituitary': 'pituitary'
-}
-
-# Mapping anwenden
-merged_df['true_class'] = merged_df['true_class'].map(lambda x: label_mapping.get(x.lower(), x))
-
-# Wahre und vorhergesagte Labels extrahieren
-y_true = merged_df['true_class']
-y_pred = merged_df['predicted_class']
-
-# Die 4 Klassennamen fest definieren (müssen exakt so heißen wie im Modell)
 class_names = config.CLASSES
+print("\nKLASSIFIKATIONSBERICHT (EXTERNER DATENSATZ):\n")
+y_true, y_pred = merged_df["true_class"], merged_df["predicted_class"]
+print(classification_report(y_true, y_pred, labels=class_names, digits=3))
 
-# Klassifikationsbericht ausgeben
-print("KLASSIFIKATIONSBERICHT (EXTERNER DATENSATZ):\n")
-report = classification_report(y_true, y_pred, target_names=class_names, labels=class_names)
-print(report)
+metrics = compute_metrics(y_true, y_pred, class_names)
+save_json(metrics, config.METRICS_EXTERNAL_JSON)
 
-
-#%% ============================================================================
-# BLOCK 3: CONFUSION MATRIX PLOTTEN
+# %% ============================================================================
+# BLOCK 3: KONFUSIONSMATRIX
 # ==============================================================================
 
-# Confusion Matrix berechnen
-cm = confusion_matrix(y_true, y_pred, labels=class_names)
+out = config.FIGURES_DIR / "confusion_matrix_external.png"
+plot_confusion_matrix(metrics["confusion_matrix"], class_names, "Confusion matrix - external dataset",
+                      out, cmap="Oranges")
 
-# Plotten
-plt.figure(figsize=(8, 6))
-sns.heatmap(cm, annot=True, fmt='d', cmap='Oranges', # Oranges zur Unterscheidung von der internen Evaluierung (Blues)
-            xticklabels=class_names, yticklabels=class_names)
-plt.title('Confusion Matrix - Externer Validierungsdatensatz')
-plt.xlabel('Vorhergesagte Klasse (KI)')
-plt.ylabel('Tatsächliche Klasse (Realität)')
-plt.tight_layout()
-
-# Abspeichern für die Präsentation
-save_path = FIGURES_DIR / "confusion_matrix_extern.png"
-plt.savefig(save_path, dpi=300)
-print(f"✅ Externe Confusion Matrix gespeichert unter: {save_path.name}")
-
-plt.show()
-print("==================================================================")
+print(f"Kennzahlen gespeichert: {config.METRICS_EXTERNAL_JSON}")
+print(f"Konfusionsmatrix:       {out}")

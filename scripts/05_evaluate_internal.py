@@ -1,132 +1,108 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
-Created on Tue Aug 11 12:34:51 2026
+SKRIPT 05: INTERNE EVALUIERUNG (Lernkurven & Konfusionsmatrix)
 
-@author: h
+Bewertet das trainierte Modell auf dem zurueckgehaltenen Testdatensatz
+(Nickparvar 'Testing') und speichert Kennzahlen, Vorhersagen und Abbildungen.
 """
 
-#%% ============================================================================
-# SCRIPT 04: INTERNE EVALUIERUNG (Lernkurven & Confusion Matrix)
+# %% ============================================================================
+# BLOCK 1: PFADE & LERNKURVEN
 # ==============================================================================
 
+from pathlib import Path
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-from pathlib import Path
 import tensorflow as tf
-from sklearn.metrics import classification_report, confusion_matrix
+from matplotlib.ticker import MaxNLocator
+from sklearn.metrics import classification_report
 
 from cerebrocam import config
-
-#%% ============================================================================
-# BLOCK 1: PFADE & LERNKURVEN PLOTTEN
-# ==============================================================================
-
-print("==================================================================")
-print("📊 ERSTELLE LERNKURVEN FÜR DIE DOKUMENTATION")
-print("==================================================================\n")
+from cerebrocam.evaluation import compute_metrics, plot_confusion_matrix, save_json
 
 TEST_DIR = config.TEST_PROCESSED_DIR
-MODEL_PATH = config.MODEL_PATH
-HISTORY_PATH = config.HISTORY_CSV
 FIGURES_DIR = config.FIGURES_DIR
 FIGURES_DIR.mkdir(parents=True, exist_ok=True)
 
-# Historie laden
-if HISTORY_PATH.exists():
-    history_df = pd.read_csv(HISTORY_PATH)
-    epochs = range(1, len(history_df) + 1)
-    
-    plt.figure(figsize=(14, 5))
-    
-    # Plot 1: Accuracy
-    plt.subplot(1, 2, 1)
-    plt.plot(epochs, history_df['accuracy'], label='Trainings-Accuracy', marker='o')
-    plt.plot(epochs, history_df['val_accuracy'], label='Validierungs-Accuracy', marker='o')
-    plt.title('Modell-Genauigkeit (Accuracy)')
-    plt.xlabel('Epochen')
-    plt.ylabel('Accuracy')
-    plt.legend()
-    plt.grid(True)
-    
-    # Plot 2: Loss
-    plt.subplot(1, 2, 2)
-    plt.plot(epochs, history_df['loss'], label='Trainings-Loss', marker='o')
-    plt.plot(epochs, history_df['val_loss'], label='Validierungs-Loss', marker='o')
-    plt.title('Modell-Verlust (Loss)')
-    plt.xlabel('Epochen')
-    plt.ylabel('Loss')
-    plt.legend()
-    plt.grid(True)
-    
-    plt.tight_layout()
-    plt.savefig(FIGURES_DIR / "lernkurven.png", dpi=300)
-    print("✅ Lernkurven wurden als 'lernkurven.png' gespeichert.")
-    plt.show()
-else:
-    print("❌ Keine Trainingshistorie gefunden!")
+print("==================================================================")
+print("LERNKURVEN")
+print("==================================================================\n")
 
-#%% ============================================================================
-# BLOCK 2: TESTDATEN LADEN & VORHERSAGEN MACHEN
+if config.HISTORY_CSV.exists():
+    history_df = pd.read_csv(config.HISTORY_CSV)
+    epochs = range(1, len(history_df) + 1)
+    best_epoch = int(np.argmin(history_df["val_loss"].to_numpy())) + 1
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+    for ax, metric, title in [(axes[0], "accuracy", "Model accuracy"), (axes[1], "loss", "Model loss")]:
+        ax.plot(epochs, history_df[metric], label=f"Training {metric}", marker="o")
+        ax.plot(epochs, history_df[f"val_{metric}"], label=f"Validation {metric}", marker="o")
+        ax.axvline(best_epoch, color="grey", linestyle="--", label=f"Best epoch ({best_epoch})")
+        ax.set_title(title)
+        ax.set_xlabel("Epoch")
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        ax.set_ylabel(metric.capitalize())
+        ax.legend()
+        ax.grid(True)
+    plt.tight_layout()
+    out = FIGURES_DIR / "learning_curves.png"
+    plt.savefig(out, dpi=300)
+    plt.show()
+    plt.close(fig)
+    print(f"Lernkurven gespeichert: {out}")
+else:
+    print(f"Keine Trainingshistorie gefunden ({config.HISTORY_CSV}), Lernkurven werden uebersprungen.")
+
+# %% ============================================================================
+# BLOCK 2: TESTDATEN LADEN & VORHERSAGEN
 # ==============================================================================
 
 print("\n==================================================================")
-print("🧠 LADE MODELL UND BERECHNE VORHERSAGEN (TEST-DATEN)")
+print("VORHERSAGEN AUF DEM INTERNEN TESTDATENSATZ")
 print("==================================================================\n")
 
-# WICHTIG: shuffle=False ist zwingend erforderlich, damit die echten Labels 
-# mit den Modellvorhersagen in der gleichen Reihenfolge bleiben!
+# shuffle=False ist zwingend: nur so passen Vorhersagen und echte Labels zusammen
 test_dataset = tf.keras.utils.image_dataset_from_directory(
     TEST_DIR,
     image_size=config.IMG_SIZE,
     batch_size=config.BATCH_SIZE,
-    label_mode='categorical',
-    shuffle=False 
+    label_mode="categorical",
+    shuffle=False,
 )
-
 class_names = test_dataset.class_names
-print(f"• Klassen: {class_names}")
 
-# Modell laden
-model = tf.keras.models.load_model(MODEL_PATH)
-print("• Bestes Modell erfolgreich geladen.")
+model = tf.keras.models.load_model(config.MODEL_PATH)
+print(f"Modell geladen: {config.MODEL_PATH}")
 
-# Vorhersagen generieren
-print("• Führe Vorhersagen auf dem Testdatensatz aus (das kann einen Moment dauern)...")
-predictions = model.predict(test_dataset)
+probabilities = model.predict(test_dataset, verbose=0)
+y_pred_idx = np.argmax(probabilities, axis=1)
+y_true_idx = np.argmax(np.concatenate([y for _, y in test_dataset], axis=0), axis=1)
+y_true = [class_names[i] for i in y_true_idx]
+y_pred = [class_names[i] for i in y_pred_idx]
 
-# Höchste Wahrscheinlichkeit als Klasse nehmen (Argmax)
-y_pred = np.argmax(predictions, axis=1)
+predictions = pd.DataFrame({
+    "file": [str(Path(p).relative_to(TEST_DIR)) for p in test_dataset.file_paths],
+    "true_class": y_true,
+    "predicted_class": y_pred,
+    "confidence": probabilities.max(axis=1).round(4),
+})
+predictions.to_csv(config.PREDICTIONS_INTERNAL_CSV, index=False)
 
-# Wahre Labels extrahieren
-y_true = np.concatenate([y for x, y in test_dataset], axis=0)
-y_true = np.argmax(y_true, axis=1)
-
-#%% ============================================================================
-# BLOCK 3: CONFUSION MATRIX & KLASSIFIKATIONSBERICHT
+# %% ============================================================================
+# BLOCK 3: KENNZAHLEN & KONFUSIONSMATRIX
 # ==============================================================================
 
-print("\n==================================================================")
-print("📈 EVALUIERUNGSERGEBNISSE")
-print("==================================================================\n")
+print("KLASSIFIKATIONSBERICHT (INTERNER TESTDATENSATZ):\n")
+print(classification_report(y_true, y_pred, labels=class_names, digits=3))
 
-# Klassifikationsbericht ausgeben
-print("KLASSIFIKATIONSBERICHT:\n")
-report = classification_report(y_true, y_pred, target_names=class_names)
-print(report)
+metrics = compute_metrics(y_true, y_pred, class_names)
+save_json(metrics, config.METRICS_INTERNAL_JSON)
 
-# Confusion Matrix berechnen & plotten
-cm = confusion_matrix(y_true, y_pred)
+plot_confusion_matrix(metrics["confusion_matrix"], class_names, "Confusion matrix - internal test set",
+                      FIGURES_DIR / "confusion_matrix_internal.png", cmap="Blues")
 
-plt.figure(figsize=(8, 6))
-sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
-            xticklabels=class_names, yticklabels=class_names)
-plt.title('Confusion Matrix - Interner Testdatensatz')
-plt.xlabel('Vorhergesagte Klasse (KI)')
-plt.ylabel('Tatsächliche Klasse (Realität)')
-plt.tight_layout()
-plt.savefig(FIGURES_DIR / "confusion_matrix.png", dpi=300)
-print("\n✅ Confusion Matrix wurde als 'confusion_matrix.png' gespeichert.")
-plt.show()
+print(f"Kennzahlen gespeichert:   {config.METRICS_INTERNAL_JSON}")
+print(f"Vorhersagen gespeichert:  {config.PREDICTIONS_INTERNAL_CSV}")
+print(f"Konfusionsmatrix:         {FIGURES_DIR / 'confusion_matrix_internal.png'}")

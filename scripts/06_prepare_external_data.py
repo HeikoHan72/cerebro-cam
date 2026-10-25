@@ -1,101 +1,72 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
-Created on Mon Aug 10 15:46:36 2026
+SKRIPT 06: EXTERNE DATEN AUFBEREITEN (Anonymisierung & Mapping)
 
-@author: h
+Bereitet den externen Datensatz (Sartaj) fuer eine verblindete Inferenz vor:
+Alle Bilder werden mit derselben Funktion wie die Trainingsdaten vorverarbeitet,
+in zufaelliger, aber reproduzierbarer Reihenfolge durchnummeriert und flach in
+einem Ordner abgelegt. Die wahren Klassen stehen nur in der Mapping-CSV.
 """
 
-#%% ============================================================================
-# SCRIPT: REKURSIVES PREPROCESSING, ANONYMISIERUNG & CSV-MAPPING-ERSTELLUNG
+# %% ============================================================================
+# BLOCK 1: PFADE & KONFIGURATION
 # ==============================================================================
 
-from pathlib import Path
-from PIL import Image
 import csv
+import random
 
 from cerebrocam import config
+from cerebrocam.data import list_images
+from cerebrocam.preprocessing import preprocess_image
 
-# Quellordner: externer Datensatz (Sartaj), eingerichtet durch 00_setup_data.py
-SRC_DIR = config.SARTAJ_DIR
-
-# Zielordner für die anonymisierten Bilder
+SRC_DIR = config.SARTAJ_DIR  # eingerichtet durch 00_setup_data.py
 DEST_DIR = config.EXTERNAL_UNLABELED_DIR
-
-# Pfad für die Mapping-CSV-Datei zur späteren Kontrolle
 MAPPING_CSV = config.EXTERNAL_MAPPING_CSV
 
+if not SRC_DIR.exists():
+    raise FileNotFoundError(
+        f"Externer Datensatz nicht gefunden: {SRC_DIR}. Bitte zuerst 00_setup_data.py ausfuehren."
+    )
 
-def process_and_create_mapping():
-    print("==================================================================")
-    print("📁 STARTE PREPROCESSING, ANONYMISIERUNG & MAPPING-ERSTELLUNG")
-    print("==================================================================\n")
-    
-    if not SRC_DIR.exists():
-        print(f"❌ Fehler: Der Quellpfad existiert nicht: {SRC_DIR}")
-        return
+# %% ============================================================================
+# BLOCK 2: BILDER SAMMELN & REIHENFOLGE FESTLEGEN
+# Sortieren macht die Liste rechnerunabhaengig, das Mischen mit festem Seed
+# sorgt dafuer, dass die neuen Dateinamen keine Klassenreihenfolge verraten.
+# ==============================================================================
 
-    DEST_DIR.mkdir(parents=True, exist_ok=True)
-    
-    # Unterstützte Bildformate
-    valid_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
-    
-    # Rekursive Suche über alle Unterordner hinweg
-    image_paths = [
-        p for p in SRC_DIR.rglob("*") 
-        if p.is_file() and p.suffix.lower() in valid_extensions and DEST_DIR not in p.parents
-    ]
-    
-    print(f"• Insgesamt {len(image_paths)} Bilddateien gefunden.")
-    
-    mapping_data = []
-    counter = 1
-    total_processed = 0
-    
-    for img_path in image_paths:
-        try:
-            # Echten Ordnernamen als wahre Klasse ermitteln (z.B. glioma, meningioma etc.)
-            true_class = img_path.parent.name
-            if true_class == "Unklassifiziert":
-                continue
-                
-            # Neuer anonymer Dateiname
-            new_filename = f"{counter:05d}.jpg"
-            dest_path = DEST_DIR / new_filename
-            
-            # Bild öffnen, in RGB konvertieren und auf 150x150 skalieren
-            with Image.open(img_path) as img:
-                img_rgb = img.convert("RGB")
-                img_resized = img_rgb.resize(config.IMG_SIZE, Image.Resampling.LANCZOS)
-                img_resized.save(dest_path)
-                
-            # Mapping-Eintrag für die spätere Kontrolle erfassen
-            mapping_data.append({
-                "new_filename": new_filename,
-                "true_class": true_class,
-                "original_filename": img_path.name,
-                "original_path": str(img_path)
-            })
-            
-            counter += 1
-            total_processed += 1
-            
-        except Exception as e:
-            print(f"⚠️ Warnung bei Datei {img_path.name}: {e}")
-            
-    # Mapping als CSV-Datei abspeichern
-    with open(MAPPING_CSV, mode="w", newline="", encoding="utf-8") as csv_file:
-        fieldnames = ["new_filename", "true_class", "original_filename", "original_path"]
-        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
-        writer.writeheader()
-        for row in mapping_data:
-            writer.writerow(row)
-            
-    print("\n------------------------------------------------------------------")
-    print(f"✅ FERTIG! {total_processed} Bilder verarbeitet und nach '{DEST_DIR.name}' kopiert.")
-    print(f"📄 Mapping-Tabelle erfolgreich gespeichert unter: {MAPPING_CSV}")
-    print("------------------------------------------------------------------\n")
+image_paths = list_images(SRC_DIR, recursive=True)
+random.Random(config.SEED).shuffle(image_paths)
+print(f"{len(image_paths)} Bilddateien gefunden.")
 
+# %% ============================================================================
+# BLOCK 3: VORVERARBEITEN, ANONYMISIEREN & MAPPING SCHREIBEN
+# ==============================================================================
 
-if __name__ == "__main__":
-    process_and_create_mapping()
+DEST_DIR.mkdir(parents=True, exist_ok=True)
+
+# Schutz vor Altlasten: fremde Dateien im Zielordner wuerden in Skript 07 mitklassifiziert
+planned = {f"{i:05d}.jpg" for i in range(1, len(image_paths) + 1)}
+unexpected = [p.name for p in DEST_DIR.iterdir() if p.name not in planned]
+if unexpected:
+    raise RuntimeError(f"{len(unexpected)} unerwartete Dateien in {DEST_DIR} (z. B. {unexpected[0]}). "
+                       "Bitte den Ordner leeren und das Skript erneut starten.")
+
+mapping_rows = []
+for counter, img_path in enumerate(image_paths, start=1):
+    new_filename = f"{counter:05d}.jpg"
+    preprocess_image(img_path, DEST_DIR / new_filename)
+    mapping_rows.append({
+        "new_filename": new_filename,
+        # Ordnername = wahre Klasse, z. B. 'glioma_tumor'
+        "true_class": img_path.parent.name,
+        # relativer Pfad, z. B. 'Training/glioma_tumor/gg (1).jpg'
+        "original_path": img_path.relative_to(SRC_DIR).as_posix(),
+    })
+
+with open(MAPPING_CSV, mode="w", newline="", encoding="utf-8") as csv_file:
+    writer = csv.DictWriter(csv_file, fieldnames=["new_filename", "true_class", "original_path"])
+    writer.writeheader()
+    writer.writerows(mapping_rows)
+
+print(f"{len(mapping_rows)} Bilder anonymisiert in: {DEST_DIR}")
+print(f"Mapping-Tabelle gespeichert: {MAPPING_CSV}")

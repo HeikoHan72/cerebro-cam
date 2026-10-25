@@ -40,17 +40,29 @@ MODEL_PATH = MODELS_DIR / "cerebrocam_best_model.keras"
 RESULTS_DIR = PROJECT_ROOT / "results"
 FIGURES_DIR = RESULTS_DIR / "figures"
 HISTORY_CSV = RESULTS_DIR / "training_history.csv"
-PREDICTIONS_CSV = RESULTS_DIR / "inference_predictions.csv"
+TRAINING_SUMMARY_JSON = RESULTS_DIR / "training_summary.json"
+PREDICTIONS_INTERNAL_CSV = RESULTS_DIR / "predictions_internal.csv"
+PREDICTIONS_EXTERNAL_CSV = RESULTS_DIR / "predictions_external.csv"
+METRICS_INTERNAL_JSON = RESULTS_DIR / "metrics_internal.json"
+METRICS_EXTERNAL_JSON = RESULTS_DIR / "metrics_external.json"
 
 # ---------------------------------------------------------------------------
 # Klassen (alphabetisch, so wie Keras sie aus den Ordnernamen liest)
 # ---------------------------------------------------------------------------
 CLASSES = ["glioma", "meningioma", "notumor", "pituitary"]
 
+# Ordnernamen im externen Datensatz -> Klassennamen des Modells
+SARTAJ_LABEL_MAP = {
+    "glioma_tumor": "glioma",
+    "meningioma_tumor": "meningioma",
+    "no_tumor": "notumor",
+    "pituitary_tumor": "pituitary",
+}
+
 # ---------------------------------------------------------------------------
 # Bilder und Training
 # ---------------------------------------------------------------------------
-IMG_SIZE = (150, 150)  # (Hoehe, Breite)
+IMG_SIZE = (150, 150)  # (Hoehe, Breite) wie bei Keras; PIL erwartet (Breite, Hoehe)
 JPEG_QUALITY = 95
 BATCH_SIZE = 32
 EPOCHS = 20
@@ -83,8 +95,12 @@ DATASETS = {
         "sha256": "b97a99ee09daf073bfa3e49a5a09002a582b4ee8478a26d3af3a2c67be62c79c",
         "target_dir": SARTAJ_DIR,
         "expected_counts": {
-            "Training": {"glioma_tumor": 826, "meningioma_tumor": 822, "no_tumor": 395, "pituitary_tumor": 827},
-            "Testing": {"glioma_tumor": 100, "meningioma_tumor": 115, "no_tumor": 105, "pituitary_tumor": 74},
+            "Training": {
+                "glioma_tumor": 826, "meningioma_tumor": 822, "no_tumor": 395, "pituitary_tumor": 827
+            },
+            "Testing": {
+                "glioma_tumor": 100, "meningioma_tumor": 115, "no_tumor": 105, "pituitary_tumor": 74
+            },
         },
     },
 }

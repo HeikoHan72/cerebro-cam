@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 SKRIPT 00: DATEN EINRICHTEN
 

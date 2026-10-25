@@ -1,118 +1,60 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
-Created on Tue Aug 11 12:40:12 2026
+SKRIPT 07: INFERENZ AUF DEN ANONYMISIERTEN EXTERNEN BILDERN
 
-@author: h
+Das Modell klassifiziert alle Bilder aus data/external/unlabeled/, ohne die
+wahren Klassen zu kennen. Die Bilder werden genauso eingelesen wie beim
+Training und bei der internen Evaluierung (Keras image_dataset_from_directory).
 """
 
-#%% ============================================================================
-# SCRIPT 06: INFERENZ AUSFÜHREN (Auf unklassifizierten Daten)
-# ==============================================================================
-
-import csv
-import numpy as np
-from pathlib import Path
-import tensorflow as tf
-from tensorflow.keras.preprocessing import image
-
-from cerebrocam import config
-
-#%% ============================================================================
+# %% ============================================================================
 # BLOCK 1: PFADE & KONFIGURATION
 # ==============================================================================
 
-print("==================================================================")
-print("⚙️ INITIALISIERE INFERENZ-UMGEBUNG")
-print("==================================================================\n")
+from pathlib import Path
 
-# Pfade aus der zentralen Konfiguration
+import numpy as np
+import pandas as pd
+import tensorflow as tf
+
+from cerebrocam import config
+
 INFERENCE_DIR = config.EXTERNAL_UNLABELED_DIR
-MODEL_PATH = config.MODEL_PATH
-PREDICTIONS_CSV = config.PREDICTIONS_CSV
-PREDICTIONS_CSV.parent.mkdir(parents=True, exist_ok=True)
-
-# Die genauen Klassennamen in alphabetischer Reihenfolge (wie beim Training)
-CLASS_NAMES = config.CLASSES
+CLASS_NAMES = config.CLASSES  # alphabetisch, wie beim Training
 
 if not INFERENCE_DIR.exists():
-    print(f"❌ Fehler: Der Inferenz-Ordner wurde nicht gefunden:\n{INFERENCE_DIR}")
-    print("Bitte zuerst scripts/06_prepare_external_data.py ausführen.")
-    exit()
+    raise FileNotFoundError(
+        f"Inferenz-Ordner nicht gefunden: {INFERENCE_DIR}. "
+        "Bitte zuerst 06_prepare_external_data.py ausfuehren."
+    )
 
-#%% ============================================================================
-# BLOCK 2: MODELL LADEN
+# %% ============================================================================
+# BLOCK 2: MODELL & BILDER LADEN
 # ==============================================================================
 
-print("• Lade das trainierte Modell...")
-model = tf.keras.models.load_model(MODEL_PATH)
-print(f"✅ Modell '{MODEL_PATH.name}' erfolgreich geladen.\n")
+model = tf.keras.models.load_model(config.MODEL_PATH)
+print(f"Modell geladen: {config.MODEL_PATH}")
 
-#%% ============================================================================
-# BLOCK 3: BILDER EINLESEN UND VORHERSAGEN
+dataset = tf.keras.utils.image_dataset_from_directory(
+    INFERENCE_DIR,
+    labels=None,  # keine Labels: verblindete Inferenz
+    image_size=config.IMG_SIZE,
+    batch_size=config.BATCH_SIZE,
+    shuffle=False,
+)
+
+# %% ============================================================================
+# BLOCK 3: VORHERSAGEN & SPEICHERN
 # ==============================================================================
 
-print("==================================================================")
-print("🚀 STARTE VORHERSAGEN (INFERENZ)")
-print("==================================================================\n")
+probabilities = model.predict(dataset, verbose=0)
+predictions = pd.DataFrame({
+    "new_filename": [Path(p).name for p in dataset.file_paths],
+    "predicted_class": [CLASS_NAMES[i] for i in np.argmax(probabilities, axis=1)],
+    "confidence": probabilities.max(axis=1).round(4),
+})
+config.PREDICTIONS_EXTERNAL_CSV.parent.mkdir(parents=True, exist_ok=True)
+predictions.to_csv(config.PREDICTIONS_EXTERNAL_CSV, index=False)
 
-# Alle JPG-Bilder im Ordner finden und sortieren
-image_paths = sorted([p for p in INFERENCE_DIR.glob("*.jpg")])
-print(f"• {len(image_paths)} anonymisierte Bilder zur Verarbeitung gefunden.")
-
-results = []
-counter = 0
-
-for img_path in image_paths:
-    try:
-        # Bild laden und auf die beim Training verwendete Größe (150x150) anpassen
-        img = image.load_img(img_path, target_size=config.IMG_SIZE)
-        
-        # Bild in ein Numpy-Array umwandeln
-        img_array = image.img_to_array(img)
-        
-        # Eine zusätzliche Dimension hinzufügen (Batch-Größe von 1 simulieren)
-        # Das Modell erwartet (Batch, Height, Width, Channels)
-        img_array = np.expand_dims(img_array, axis=0)
-        
-        # Vorhersage generieren (verbose=0 unterdrückt den Konsolen-Spam)
-        prediction_probs = model.predict(img_array, verbose=0)
-        
-        # Höchste Wahrscheinlichkeit ermitteln
-        predicted_index = np.argmax(prediction_probs, axis=1)[0]
-        confidence = np.max(prediction_probs)
-        predicted_class = CLASS_NAMES[predicted_index]
-        
-        # Ergebnis in der Liste speichern
-        results.append({
-            "new_filename": img_path.name,
-            "predicted_class": predicted_class,
-            "confidence": round(float(confidence), 4) # Auf 4 Nachkommastellen runden
-        })
-        
-        counter += 1
-        # Kleines Feedback in der Konsole alle 50 Bilder
-        if counter % 50 == 0:
-            print(f"  ... {counter}/{len(image_paths)} Bilder verarbeitet.")
-            
-    except Exception as e:
-        print(f"⚠️ Fehler bei Bild {img_path.name}: {e}")
-
-#%% ============================================================================
-# BLOCK 4: ERGEBNISSE ALS CSV SPEICHERN
-# ==============================================================================
-
-print("\n==================================================================")
-print("💾 SPEICHERE VORHERSAGEN")
-print("==================================================================\n")
-
-with open(PREDICTIONS_CSV, mode="w", newline="", encoding="utf-8") as csv_file:
-    fieldnames = ["new_filename", "predicted_class", "confidence"]
-    writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
-    writer.writeheader()
-    for row in results:
-        writer.writerow(row)
-
-print(f"✅ Inferenz abgeschlossen!")
-print(f"✅ Vorhersagen gespeichert unter: {PREDICTIONS_CSV.name}")
-print("==================================================================")
+print(f"{len(predictions)} Bilder klassifiziert.")
+print(f"Vorhersagen gespeichert: {config.PREDICTIONS_EXTERNAL_CSV}")

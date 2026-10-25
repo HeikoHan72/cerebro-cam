@@ -46,3 +46,15 @@ def count_images(root: Path, extensions: set = config.IMAGE_EXTENSIONS) -> dict:
 def counts_match(actual: dict, expected: dict) -> bool:
     """Prueft, ob die gezaehlten Bilder exakt den erwarteten Zahlen entsprechen."""
     return actual == expected
+
+
+def list_images(
+    folder: Path, recursive: bool = False, extensions: set = config.IMAGE_EXTENSIONS
+) -> list[Path]:
+    """Liefert alle Bilddateien eines Ordners in fester, sortierter Reihenfolge.
+
+    Die Sortierung ist wichtig: Die Reihenfolge, in der das Dateisystem Dateien
+    liefert, kann sich zwischen Rechnern unterscheiden.
+    """
+    pattern = "**/*" if recursive else "*"
+    return sorted(p for p in folder.glob(pattern) if p.is_file() and p.suffix.lower() in extensions)

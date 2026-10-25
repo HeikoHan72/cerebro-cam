@@ -1,26 +1,26 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
-Created on Mon Aug 10 14:02:11 2026
+SKRIPT 01: EXPLORATIVE DATENANALYSE (EDA)
 
-@author: h
+Untersucht die Rohdaten des Trainings- und Testdatensatzes (Nickparvar):
+Klassenverteilung, Bildgroessen, Farbmodi und Beispielbilder.
+Voraussetzung: scripts/00_setup_data.py wurde ausgefuehrt.
 """
 
-#%% ============================================================================
-# BLOCK 1: IMPORTE & ABSOLUTER SKRIPTPFAD
-# Beschreibung: Zwingt Python, exakt im Speicherort dieses Skripts zu suchen.
+# %% ============================================================================
+# BLOCK 1: IMPORTE & PFADE
 # ==============================================================================
 
-import os
-from pathlib import Path
 from collections import Counter
-from PIL import Image
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 import seaborn as sns
+from PIL import Image
 
 from cerebrocam import config
+from cerebrocam.data import list_images
 
-# Pfade und Klassen aus der zentralen Konfiguration
 TRAIN_DIR = config.TRAIN_RAW_DIR
 TEST_DIR = config.TEST_RAW_DIR
 FIGURES_DIR = config.FIGURES_DIR
@@ -28,188 +28,147 @@ FIGURES_DIR.mkdir(parents=True, exist_ok=True)
 
 CLASSES = config.CLASSES
 
-#%% ============================================================================
-# BLOCK 2: PFADPRÜFUNG
-# Beschreibung: Prüft direkt, ob die Unterordner 'training' und 'test' vorhanden sind.
+
+def print_header(title: str) -> None:
+    print("------------------------------------------------------------------")
+    print(title)
+    print("------------------------------------------------------------------")
+
+
+# %% ============================================================================
+# BLOCK 2: PFADPRUEFUNG
+# Beschreibung: Prueft, ob die Ordner 'Training' und 'Testing' vorhanden sind.
 # ==============================================================================
 
 def check_paths():
-    print("------------------------------------------------------------------")
-    print("🔍 BLOCK 2: Pfadprüfung")
-    print("------------------------------------------------------------------")
-    
+    print_header("BLOCK 2: Pfadpruefung")
     if not TRAIN_DIR.exists() or not TEST_DIR.exists():
         raise FileNotFoundError(
-            f"❌ Datenordner nicht gefunden: {TRAIN_DIR} / {TEST_DIR}\n"
-            "Bitte zuerst scripts/00_setup_data.py ausführen."
+            f"Datenordner nicht gefunden: {TRAIN_DIR} / {TEST_DIR}\n"
+            "Bitte zuerst scripts/00_setup_data.py ausfuehren."
         )
-        
-    print("✅ Ordner 'training' gefunden.")
-    print("✅ Ordner 'test' gefunden.\n")
+    print(f"Ordner gefunden: {TRAIN_DIR}")
+    print(f"Ordner gefunden: {TEST_DIR}\n")
 
 
-#%% ============================================================================
-# BLOCK 3: KLASSENVERTEILUNG ZÄHLEN
-# Beschreibung: Zählt alle Bilddateien pro Kategorie in 'training' und 'test'.
+# %% ============================================================================
+# BLOCK 3: KLASSENVERTEILUNG ZAEHLEN
+# Beschreibung: Zaehlt alle Bilddateien pro Klasse in 'Training' und 'Testing'.
 # ==============================================================================
 
-def get_class_counts(data_dir: Path):
-    counts = {}
-    valid_extensions = {".jpg", ".jpeg", ".png", ".tif", ".bmp"}
-    
-    for cls in CLASSES:
-        cls_folder = data_dir / cls
-        if cls_folder.exists():
-            images = [f for f in cls_folder.iterdir() if f.suffix.lower() in valid_extensions]
-            counts[cls] = len(images)
-        else:
-            counts[cls] = 0
-    return counts
+def get_class_counts(data_dir: Path) -> dict:
+    return {cls: len(list_images(data_dir / cls)) for cls in CLASSES}
 
 
 def analyze_distributions():
-    print("------------------------------------------------------------------")
-    print("📊 BLOCK 3: Klassenverteilung (Class Counts)")
-    print("------------------------------------------------------------------")
-    
+    print_header("BLOCK 3: Klassenverteilung")
     train_counts = get_class_counts(TRAIN_DIR)
     test_counts = get_class_counts(TEST_DIR)
-    
-    print("Training-Datensatz:")
-    for cls, count in train_counts.items():
-        print(f"  • {cls:12s}: {count:5d} Bilder")
-    print(f"  Gesamt Training : {sum(train_counts.values())} Bilder\n")
-    
-    print("Test-Datensatz:")
-    for cls, count in test_counts.items():
-        print(f"  • {cls:12s}: {count:5d} Bilder")
-    print(f"  Gesamt Test     : {sum(test_counts.values())} Bilder\n")
-    
+
+    for name, counts in [("Training", train_counts), ("Test", test_counts)]:
+        print(f"{name}-Datensatz:")
+        for cls, count in counts.items():
+            print(f"  {cls:12s}: {count:5d} Bilder")
+        print(f"  Gesamt        : {sum(counts.values())} Bilder\n")
     return train_counts, test_counts
 
 
-#%% ============================================================================
-# BLOCK 4: BILDEIGENSCHAFTEN UND FORMATAUSWERTUNG
-# Beschreibung: Untersucht Auflösungen und Farbkanäle einer Stichprobe.
+# %% ============================================================================
+# BLOCK 4: BILDEIGENSCHAFTEN
+# Beschreibung: Untersucht Aufloesungen und Farbmodi aller Trainingsbilder.
 # ==============================================================================
 
-def inspect_image_properties(data_dir: Path, samples_per_class=50):
-    print("------------------------------------------------------------------")
-    print("🖼️  BLOCK 4: Bildeigenschaften (Dimensions & Channels)")
-    print("------------------------------------------------------------------")
-    
-    sizes = []
-    modes = []
-    
+def inspect_image_properties(data_dir: Path):
+    print_header("BLOCK 4: Bildeigenschaften (Groessen und Farbmodi)")
+    sizes, modes = [], []
     for cls in CLASSES:
-        cls_folder = data_dir / cls
-        if not cls_folder.exists():
-            continue
-            
-        images = list(cls_folder.glob("*.*"))[:samples_per_class]
-        for img_path in images:
-            try:
-                with Image.open(img_path) as img:
-                    sizes.append(img.size)
-                    modes.append(img.mode)
-            except Exception as e:
-                print(f"  ⚠️ Fehler beim Lesen von {img_path.name}: {e}")
-                
+        for img_path in list_images(data_dir / cls):
+            with Image.open(img_path) as img:
+                sizes.append(img.size)
+                modes.append(img.mode)
+
     size_counts = Counter(sizes)
-    mode_counts = Counter(modes)
-    
-    print("Häufigste Bildgrößen (Breite x Höhe):")
-    for size, count in size_counts.most_common(5):
-        print(f"  • {size[0]}x{size[1]} Pixel: {count} Bilder")
-        
-    print("\nErkannte Farbkanal-Modi:")
-    for mode, count in mode_counts.items():
-        print(f"  • Modus '{mode}': {count} Bilder")
+    widths = [w for w, _ in sizes]
+    heights = [h for _, h in sizes]
+    print(f"Untersuchte Bilder: {len(sizes)}, verschiedene Groessen: {len(size_counts)}")
+    print(f"Breite: {min(widths)}-{max(widths)} Pixel, Hoehe: {min(heights)}-{max(heights)} Pixel")
+    print("Haeufigste Groessen (Breite x Hoehe):")
+    for (w, h), count in size_counts.most_common(5):
+        print(f"  {w}x{h} Pixel: {count} Bilder")
+    print("\nFarbmodi:")
+    for mode, count in Counter(modes).most_common():
+        print(f"  Modus '{mode}': {count} Bilder")
     print()
 
 
-#%% ============================================================================
+# %% ============================================================================
 # BLOCK 5: VISUALISIERUNG DER KLASSENVERTEILUNG
-# Beschreibung: Erstellt ein vergleichendes Balkendiagramm (Train vs. Test).
+# Beschreibung: Balkendiagramm Training gegen Test.
 # ==============================================================================
 
-def plot_distributions(train_counts, test_counts):
-    print("------------------------------------------------------------------")
-    print("📈 BLOCK 5: Erstellung des Verteilungs-Diagramms")
-    print("------------------------------------------------------------------")
-    
-    fig, ax = plt.subplots(1, 2, figsize=(14, 5))
-    
-    sns.barplot(x=list(train_counts.keys()), y=list(train_counts.values()), ax=ax[0], palette="Blues_d")
-    ax[0].set_title("Klassenverteilung im Training-Set", fontsize=12, fontweight='bold')
-    ax[0].set_ylabel("Anzahl Bilder")
-    ax[0].set_xlabel("Kategorie")
-    for i, v in enumerate(train_counts.values()):
-        ax[0].text(i, v + (max(train_counts.values()) * 0.02), str(v), ha='center', fontweight='bold')
-        
-    sns.barplot(x=list(test_counts.keys()), y=list(test_counts.values()), ax=ax[1], palette="Greens_d")
-    ax[1].set_title("Klassenverteilung im Test-Set", fontsize=12, fontweight='bold')
-    ax[1].set_ylabel("Anzahl Bilder")
-    ax[1].set_xlabel("Kategorie")
-    for i, v in enumerate(test_counts.values()):
-        ax[1].text(i, v + (max(test_counts.values()) * 0.02), str(v), ha='center', fontweight='bold')
-        
+def plot_distributions(train_counts: dict, test_counts: dict):
+    print_header("BLOCK 5: Verteilungsdiagramm")
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+    for ax, counts, title, palette in [
+        (axes[0], train_counts, "Class distribution - training set", "Blues_d"),
+        (axes[1], test_counts, "Class distribution - test set", "Greens_d"),
+    ]:
+        names, values = list(counts.keys()), list(counts.values())
+        sns.barplot(x=names, y=values, hue=names, palette=palette, legend=False, ax=ax)
+        ax.set_title(title, fontsize=12, fontweight="bold")
+        ax.set_ylabel("Number of images")
+        ax.set_xlabel("Class")
+        for i, v in enumerate(values):
+            ax.text(i, v + max(values) * 0.02, str(v), ha="center", fontweight="bold")
+
     plt.tight_layout()
-    plt.savefig(FIGURES_DIR / "eda_class_distribution.png", dpi=300)
+    out = FIGURES_DIR / "eda_class_distribution.png"
+    plt.savefig(out, dpi=300)
     plt.show()
-    print("✅ Diagramm 'eda_class_distribution.png' gespeichert.\n")
+    plt.close(fig)
+    print(f"Diagramm gespeichert: {out}\n")
 
 
-#%% ============================================================================
-# BLOCK 6: VISUALISIERUNG VON BEISPIELBILDERN (GRID)
-# Beschreibung: Erstellt ein Grid mit MRT-Scans aus jeder Klasse.
+# %% ============================================================================
+# BLOCK 6: BEISPIELBILDER (GRID)
+# Beschreibung: Zeigt die ersten Bilder jeder Klasse (feste, sortierte Auswahl).
 # ==============================================================================
 
-def plot_sample_grid(data_dir: Path, samples_per_class=4):
-    print("------------------------------------------------------------------")
-    print("🎨 BLOCK 6: Visualisierung von Beispielbildern (Image Grid)")
-    print("------------------------------------------------------------------")
-    
+def plot_sample_grid(data_dir: Path, samples_per_class: int = 4):
+    print_header("BLOCK 6: Beispielbilder")
     fig, axes = plt.subplots(len(CLASSES), samples_per_class, figsize=(12, 10))
-    
-    for row_idx, cls in enumerate(CLASSES):
-        cls_folder = data_dir / cls
-        images = list(cls_folder.glob("*.*"))[:samples_per_class]
-        
-        for col_idx in range(samples_per_class):
-            ax = axes[row_idx, col_idx]
-            if col_idx < len(images):
-                img_path = images[col_idx]
-                img = Image.open(img_path)
-                ax.imshow(img, cmap="gray" if img.mode == "L" else None)
-                ax.set_title(f"{cls}\n({img.size[0]}x{img.size[1]})", fontsize=9)
+    for row, cls in enumerate(CLASSES):
+        images = list_images(data_dir / cls)[:samples_per_class]
+        for col in range(samples_per_class):
+            ax = axes[row, col]
+            if col < len(images):
+                with Image.open(images[col]) as img:
+                    ax.imshow(img.copy(), cmap="gray" if img.mode == "L" else None)
+                    ax.set_title(f"{cls}\n({img.size[0]}x{img.size[1]})", fontsize=9)
             ax.axis("off")
-            
+
     plt.tight_layout()
-    plt.savefig(FIGURES_DIR / "eda_sample_grid.png", dpi=300)
+    out = FIGURES_DIR / "eda_sample_grid.png"
+    plt.savefig(out, dpi=300)
     plt.show()
-    print("✅ Beispiel-Grid 'eda_sample_grid.png' gespeichert.\n")
+    plt.close(fig)
+    print(f"Beispiel-Grid gespeichert: {out}\n")
 
 
-#%% ============================================================================
-# BLOCK 7: HAUPTAUSFÜHRUNG (MAIN ENTRY POINT)
-# Beschreibung: Steuert den Ablauf aller EDA-Schritte.
+# %% ============================================================================
+# BLOCK 7: HAUPTAUSFUEHRUNG
 # ==============================================================================
 
 def main():
     print("\n==================================================================")
-    print("🚀 STARTE EDA (PHASE 1: EXPLORATIVE DATENANALYSE)")
+    print("EDA (PHASE 1: EXPLORATIVE DATENANALYSE)")
     print("==================================================================\n")
-    
     check_paths()
     train_counts, test_counts = analyze_distributions()
     inspect_image_properties(TRAIN_DIR)
     plot_distributions(train_counts, test_counts)
     plot_sample_grid(TRAIN_DIR)
-    
-    print("==================================================================")
-    print("✅ PHASE 1 (EDA) ERFOLGREICH ABGESCHLOSSEN")
-    print("==================================================================\n")
+    print("EDA abgeschlossen.")
 
 
 if __name__ == "__main__":
