@@ -1,0 +1,60 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "CerebroCAM: Brain tumor MRI classification with duplicate-aware evaluation and Grad-CAM"
+abstract: >-
+  A compact CNN classifies brain MRI slices into glioma, meningioma, pituitary tumor and no tumor.
+  The project audits the public datasets for duplicate images with perceptual hashing, evaluates the
+  model on deduplicated internal and external test sets, tests data augmentation over three seeds and
+  explains predictions with Grad-CAM.
+authors:
+  - family-names: Han
+    given-names: Heiko
+repository-code: "https://github.com/HeikoHan72/cerebro-cam"
+license: MIT
+keywords:
+  - deep-learning
+  - cnn
+  - medical-imaging
+  - brain-tumor
+  - mri
+  - grad-cam
+  - tensorflow
+  - keras
+  - data-leakage
+references:
+  - type: data
+    title: "Brain Tumor MRI Dataset"
+    authors:
+      - family-names: Nickparvar
+        given-names: Masoud
+    publisher:
+      name: Kaggle
+    doi: 10.34740/kaggle/dsv/14832123
+    license: CC-BY-4.0
+  - type: data
+    title: "Brain Tumor Classification (MRI)"
+    authors:
+      - family-names: Bhuvaji
+        given-names: Sartaj
+      - family-names: Kadam
+        given-names: Ankita
+      - family-names: Bhumkar
+        given-names: Prajakta
+      - family-names: Dedge
+        given-names: Sameer
+      - family-names: Kanchan
+        given-names: Swati
+    publisher:
+      name: Kaggle
+    doi: 10.34740/kaggle/dsv/12745533
+    license: MIT
+  - type: data
+    title: "brain tumor dataset"
+    authors:
+      - family-names: Cheng
+        given-names: Jun
+    publisher:
+      name: figshare
+    doi: 10.6084/m9.figshare.1512427
+    license: CC-BY-4.0
