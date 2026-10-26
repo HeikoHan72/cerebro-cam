@@ -7,8 +7,9 @@ from PIL import Image
 from cerebrocam import config
 
 
-def preprocess_image(src: Path, dest: Path, img_size: tuple = config.IMG_SIZE,
-                     quality: int = config.JPEG_QUALITY) -> None:
+def preprocess_image(
+    src: Path, dest: Path, img_size: tuple = config.IMG_SIZE, quality: int = config.JPEG_QUALITY
+) -> None:
     """Liest ein Bild, wandelt es in RGB, skaliert es mit Lanczos und speichert es als JPEG.
 
     img_size ist (Hoehe, Breite) wie in Keras; PIL erwartet (Breite, Hoehe).

@@ -48,20 +48,24 @@ DEST_DIR.mkdir(parents=True, exist_ok=True)
 planned = {f"{i:05d}.jpg" for i in range(1, len(image_paths) + 1)}
 unexpected = [p.name for p in DEST_DIR.iterdir() if p.name not in planned]
 if unexpected:
-    raise RuntimeError(f"{len(unexpected)} unerwartete Dateien in {DEST_DIR} (z. B. {unexpected[0]}). "
-                       "Bitte den Ordner leeren und das Skript erneut starten.")
+    raise RuntimeError(
+        f"{len(unexpected)} unerwartete Dateien in {DEST_DIR} (z. B. {unexpected[0]}). "
+        "Bitte den Ordner leeren und das Skript erneut starten."
+    )
 
 mapping_rows = []
 for counter, img_path in enumerate(image_paths, start=1):
     new_filename = f"{counter:05d}.jpg"
     preprocess_image(img_path, DEST_DIR / new_filename)
-    mapping_rows.append({
-        "new_filename": new_filename,
-        # Ordnername = wahre Klasse, z. B. 'glioma_tumor'
-        "true_class": img_path.parent.name,
-        # relativer Pfad, z. B. 'Training/glioma_tumor/gg (1).jpg'
-        "original_path": img_path.relative_to(SRC_DIR).as_posix(),
-    })
+    mapping_rows.append(
+        {
+            "new_filename": new_filename,
+            # Ordnername = wahre Klasse, z. B. 'glioma_tumor'
+            "true_class": img_path.parent.name,
+            # relativer Pfad, z. B. 'Training/glioma_tumor/gg (1).jpg'
+            "original_path": img_path.relative_to(SRC_DIR).as_posix(),
+        }
+    )
 
 with open(MAPPING_CSV, mode="w", newline="", encoding="utf-8") as csv_file:
     writer = csv.DictWriter(csv_file, fieldnames=["new_filename", "true_class", "original_path"])

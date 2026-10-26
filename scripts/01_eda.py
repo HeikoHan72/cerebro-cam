@@ -40,6 +40,7 @@ def print_header(title: str) -> None:
 # Beschreibung: Prueft, ob die Ordner 'Training' und 'Testing' vorhanden sind.
 # ==============================================================================
 
+
 def check_paths():
     print_header("BLOCK 2: Pfadpruefung")
     if not TRAIN_DIR.exists() or not TEST_DIR.exists():
@@ -55,6 +56,7 @@ def check_paths():
 # BLOCK 3: KLASSENVERTEILUNG ZAEHLEN
 # Beschreibung: Zaehlt alle Bilddateien pro Klasse in 'Training' und 'Testing'.
 # ==============================================================================
+
 
 def get_class_counts(data_dir: Path) -> dict:
     return {cls: len(list_images(data_dir / cls)) for cls in CLASSES}
@@ -77,6 +79,7 @@ def analyze_distributions():
 # BLOCK 4: BILDEIGENSCHAFTEN
 # Beschreibung: Untersucht Aufloesungen und Farbmodi aller Trainingsbilder.
 # ==============================================================================
+
 
 def inspect_image_properties(data_dir: Path):
     print_header("BLOCK 4: Bildeigenschaften (Groessen und Farbmodi)")
@@ -106,6 +109,7 @@ def inspect_image_properties(data_dir: Path):
 # Beschreibung: Balkendiagramm Training gegen Test.
 # ==============================================================================
 
+
 def plot_distributions(train_counts: dict, test_counts: dict):
     print_header("BLOCK 5: Verteilungsdiagramm")
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
@@ -134,6 +138,7 @@ def plot_distributions(train_counts: dict, test_counts: dict):
 # Beschreibung: Zeigt die ersten Bilder jeder Klasse (feste, sortierte Auswahl).
 # ==============================================================================
 
+
 def plot_sample_grid(data_dir: Path, samples_per_class: int = 4):
     print_header("BLOCK 6: Beispielbilder")
     fig, axes = plt.subplots(len(CLASSES), samples_per_class, figsize=(12, 10))
@@ -158,6 +163,7 @@ def plot_sample_grid(data_dir: Path, samples_per_class: int = 4):
 # %% ============================================================================
 # BLOCK 7: HAUPTAUSFUEHRUNG
 # ==============================================================================
+
 
 def main():
     print("\n==================================================================")

@@ -57,8 +57,7 @@ for name, info in config.DATASETS.items():
 
     if name not in found_zips:
         raise FileNotFoundError(
-            f"[{name}] ZIP fehlt. Bitte von {info['url']} herunterladen "
-            f"und in {config.RAW_DIR} ablegen."
+            f"[{name}] ZIP fehlt. Bitte von {info['url']} herunterladen und in {config.RAW_DIR} ablegen."
         )
 
     zip_path = found_zips[name]

@@ -5,8 +5,8 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "cerebrocam"
 version = "0.1.0"
-description = "Brain tumor MRI classification with a compact CNN"
-requires-python = ">=3.10"
+description = "Brain tumor MRI classification with a compact CNN, duplicate-aware evaluation and Grad-CAM"
+requires-python = ">=3.11"
 dependencies = [
     "tensorflow>=2.16",
     "keras>=3.0",
@@ -19,5 +19,26 @@ dependencies = [
     "imagehash",
 ]
 
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+
 [tool.setuptools]
 packages = ["cerebrocam"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["cerebrocam"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = [
+    # bekannte, harmlose Hinweise aus Keras/TensorFlow
+    "ignore:`shuffle=True` was passed:UserWarning",
+    "ignore:__array__ implementation doesn't accept a copy keyword:DeprecationWarning",
+]
