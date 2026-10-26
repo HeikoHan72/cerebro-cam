@@ -75,6 +75,22 @@ def test_duplicate_summary_matches_manifest():
     assert int(overlap["eval_not_in_training"].sum()) == 806
 
 
+def test_duplicate_details_quoted_in_readme():
+    manifest = pd.read_csv(config.NICKPARVAR_MANIFEST_CSV)
+    summary = load_json(config.DUPLICATES_SUMMARY_JSON)
+    reasons = manifest["reason"].value_counts()
+    assert reasons["duplicate_within_training"] == 764
+    assert reasons["duplicate_of_training_image"] == 439
+    assert reasons["duplicate_within_test"] == 49
+    kept_test = manifest[(manifest["split"] == "Testing") & manifest["keep"]]
+    # Grauzone: Abstand 3-8 zum naechsten Trainingsbild (meist benachbarte Schicht)
+    gray_zone = kept_test["nearest_train_distance"].between(
+        config.DUPLICATE_MAX_DISTANCE + 1, config.GRAY_ZONE_MAX_DISTANCE
+    )
+    assert int(gray_zone.sum()) == 569
+    assert summary["external"]["byte_identical_to_training"] == 2257
+
+
 def test_augmentation_summary_matches_runs():
     runs = pd.read_csv(config.AUGMENTATION_RUNS_CSV)
     summary = load_json(config.AUGMENTATION_SUMMARY_JSON)
