@@ -37,6 +37,7 @@ EXTERNAL_MAPPING_CSV = EXTERNAL_DIR / "evaluation_mapping.csv"
 MODELS_DIR = PROJECT_ROOT / "models"
 MODEL_PATH = MODELS_DIR / "cerebrocam_best_model.keras"
 ORIGINAL_MODEL_PATH = MODELS_DIR / "original_model.keras"  # Modell aus der Projektwoche (August 2026)
+EXPERIMENT_MODELS_DIR = MODELS_DIR / "experiments"
 
 RESULTS_DIR = PROJECT_ROOT / "results"
 FIGURES_DIR = RESULTS_DIR / "figures"
@@ -48,6 +49,9 @@ METRICS_INTERNAL_JSON = RESULTS_DIR / "metrics_internal.json"
 METRICS_EXTERNAL_JSON = RESULTS_DIR / "metrics_external.json"
 ORIGINAL_RESULTS_DIR = RESULTS_DIR / "original"
 METRICS_ORIGINAL_MODEL_JSON = ORIGINAL_RESULTS_DIR / "metrics_original_model.json"
+EXPERIMENTS_DIR = RESULTS_DIR / "experiments"
+AUGMENTATION_RUNS_CSV = EXPERIMENTS_DIR / "augmentation_runs.csv"
+AUGMENTATION_SUMMARY_JSON = EXPERIMENTS_DIR / "augmentation_summary.json"
 
 # Ergebnisse des Duplikat-Checks (Skript 02); werden mit ins Repository aufgenommen
 DUPLICATES_DIR = RESULTS_DIR / "duplicates"
@@ -74,11 +78,24 @@ SARTAJ_LABEL_MAP = {
 IMG_SIZE = (150, 150)  # (Hoehe, Breite) wie bei Keras; PIL erwartet (Breite, Hoehe)
 JPEG_QUALITY = 95
 BATCH_SIZE = 32
-EPOCHS = 20
+EPOCHS = 40  # Obergrenze; beendet wird das Training durch Early Stopping
 VALIDATION_SPLIT = 0.2
 SEED = 42
 EARLY_STOPPING_PATIENCE = 5
 USE_CLASS_WEIGHTS = True  # gleicht aus, dass nach der Bereinigung weniger notumor-Bilder bleiben
+
+# ---------------------------------------------------------------------------
+# Data Augmentation (nur im Training aktiv, nie bei Validierung und Test)
+# Ob sie verwendet wird, entscheidet das Experiment in Skript 11.
+# ---------------------------------------------------------------------------
+USE_AUGMENTATION = False
+AUGMENTATION = {
+    "horizontal_flip": True,  # links/rechts spiegeln
+    "rotation_degrees": 10,  # zufaellige Drehung um bis zu +/- 10 Grad
+    "translation": 0.1,  # Verschiebung um bis zu 10 % der Bildgroesse
+    "zoom": 0.1,  # Zoom um bis zu +/- 10 %
+}
+EXPERIMENT_SEEDS = [42, 43, 44]
 
 # ---------------------------------------------------------------------------
 # Duplikat-Erkennung (Distanz = max(Hamming pHash, Hamming dHash), 64-Bit-Hashes)
@@ -113,11 +130,12 @@ DATASETS = {
         "target_dir": SARTAJ_DIR,
         "expected_counts": {
             "Training": {
-                "glioma_tumor": 826, "meningioma_tumor": 822, "no_tumor": 395, "pituitary_tumor": 827
+                "glioma_tumor": 826,
+                "meningioma_tumor": 822,
+                "no_tumor": 395,
+                "pituitary_tumor": 827,
             },
-            "Testing": {
-                "glioma_tumor": 100, "meningioma_tumor": 115, "no_tumor": 105, "pituitary_tumor": 74
-            },
+            "Testing": {"glioma_tumor": 100, "meningioma_tumor": 115, "no_tumor": 105, "pituitary_tumor": 74},
         },
     },
 }

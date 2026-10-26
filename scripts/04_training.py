@@ -2,151 +2,46 @@
 """
 SKRIPT 04: MODELL-TRAINING (CerebroCAM CNN)
 
-Trainiert das CNN auf den vorverarbeiteten Trainingsbildern (80 % Training,
-20 % Validierung). Mit festem Seed und deterministischen Operationen liefert
-derselbe Rechner bei jedem Lauf identische Ergebnisse.
+Trainiert das CNN auf den bereinigten, vorverarbeiteten Trainingsbildern
+(80 % Training, 20 % Validierung). Mit festem Seed und deterministischen
+Operationen liefert derselbe Rechner bei jedem Lauf identische Ergebnisse.
+Die Trainingslogik liegt in cerebrocam/training.py und wird auch vom
+Augmentation-Experiment (Skript 11) genutzt.
 """
 
 # %% ============================================================================
-# BLOCK 1: KONFIGURATION & REPRODUZIERBARKEIT
+# BLOCK 1: KONFIGURATION
 # ==============================================================================
-
-import platform
-
-import numpy as np
-import pandas as pd
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import callbacks
 
 from cerebrocam import config
-from cerebrocam.data import list_images
 from cerebrocam.evaluation import save_json
-from cerebrocam.model import build_model
-
-# Fester Seed fuer Python, NumPy und TensorFlow sowie deterministische Operationen
-tf.keras.utils.set_random_seed(config.SEED)
-tf.config.experimental.enable_op_determinism()
-
-DATA_DIR = config.TRAIN_PROCESSED_DIR
-MODEL_SAVE_PATH = config.MODEL_PATH
-HISTORY_SAVE_PATH = config.HISTORY_CSV
-SUMMARY_PATH = config.TRAINING_SUMMARY_JSON
-MODEL_SAVE_PATH.parent.mkdir(parents=True, exist_ok=True)
-HISTORY_SAVE_PATH.parent.mkdir(parents=True, exist_ok=True)
-
-if not DATA_DIR.exists():
-    raise FileNotFoundError(
-        f"Trainingsdaten nicht gefunden: {DATA_DIR}. Bitte zuerst 03_preprocessing.py ausfuehren."
-    )
-
-# %% ============================================================================
-# BLOCK 2: DATEN LADEN & SPLITTEN
-# ==============================================================================
+from cerebrocam.training import train_model
 
 print("==================================================================")
-print("LADE DATEN UND ERSTELLE TRAIN/VAL SPLIT")
+print(f"TRAINING (Seed {config.SEED}, Augmentation: {'ja' if config.USE_AUGMENTATION else 'nein'})")
 print("==================================================================\n")
 
-common = dict(
-    validation_split=config.VALIDATION_SPLIT,
-    seed=config.SEED,
-    image_size=config.IMG_SIZE,
-    batch_size=config.BATCH_SIZE,
-    label_mode="categorical",  # fuer Categorical Crossentropy
-)
-train_dataset = tf.keras.utils.image_dataset_from_directory(DATA_DIR, subset="training", **common)
-val_dataset = tf.keras.utils.image_dataset_from_directory(DATA_DIR, subset="validation", **common)
-
-# Klassennamen sichern, bevor das Dataset transformiert wird
-class_names = train_dataset.class_names
-if class_names != config.CLASSES:
-    raise ValueError(f"Unerwartete Klassen: {class_names}")
-print(f"\nGefundene Klassen: {class_names}\n")
-
-# Klassengewichte: seltenere Klassen zaehlen im Loss staerker (Gewicht = N / (K * N_Klasse)).
-# Nach der Duplikat-Bereinigung bleiben deutlich weniger notumor-Bilder uebrig.
-image_counts = {c: len(list_images(DATA_DIR / c)) for c in class_names}
-if config.USE_CLASS_WEIGHTS:
-    total = sum(image_counts.values())
-    class_weight = {i: total / (len(class_names) * image_counts[c]) for i, c in enumerate(class_names)}
-else:
-    class_weight = None
-print(f"Bilder pro Klasse: {image_counts}")
-if class_weight:
-    print("Klassengewichte: " + ", ".join(f"{c}: {class_weight[i]:.3f}" for i, c in enumerate(class_names)))
-
-AUTOTUNE = tf.data.AUTOTUNE
-train_dataset = train_dataset.cache().shuffle(1000, seed=config.SEED).prefetch(buffer_size=AUTOTUNE)
-val_dataset = val_dataset.cache().prefetch(buffer_size=AUTOTUNE)
-
 # %% ============================================================================
-# BLOCK 3: MODELL-ARCHITEKTUR (SCHLANKES CNN)
+# BLOCK 2: TRAINING
 # ==============================================================================
 
-model = build_model(num_classes=len(class_names))
-model.summary()
-
-# %% ============================================================================
-# BLOCK 4: CALLBACKS & TRAINING
-# Beide Callbacks ueberwachen dieselbe Metrik (val_loss). Dadurch enthaelt die
-# gespeicherte Datei genau die Epoche, die EarlyStopping als beste wiederherstellt.
-# ==============================================================================
-
-print("\n==================================================================")
-print("STARTE TRAINING")
-print("==================================================================\n")
-
-early_stopping = callbacks.EarlyStopping(
-    monitor="val_loss",
-    patience=config.EARLY_STOPPING_PATIENCE,  # Stopp nach 5 Epochen ohne Verbesserung
-    restore_best_weights=True,
-    verbose=1,
-)
-model_checkpoint = callbacks.ModelCheckpoint(
-    filepath=str(MODEL_SAVE_PATH),
-    monitor="val_loss",
-    save_best_only=True,
-    verbose=1,
-)
-
-history = model.fit(
-    train_dataset,
-    validation_data=val_dataset,
-    epochs=config.EPOCHS,
-    callbacks=[early_stopping, model_checkpoint],
-    class_weight=class_weight,
+model, hist_df, summary = train_model(
+    seed=config.SEED, augment=config.USE_AUGMENTATION, model_path=config.MODEL_PATH
 )
 
 # %% ============================================================================
-# BLOCK 5: HISTORIE & ZUSAMMENFASSUNG SPEICHERN
+# BLOCK 3: HISTORIE & ZUSAMMENFASSUNG SPEICHERN
 # ==============================================================================
 
-hist_df = pd.DataFrame(history.history)
-hist_df.index = pd.RangeIndex(1, len(hist_df) + 1, name="epoch")
-hist_df.to_csv(HISTORY_SAVE_PATH)
-
-best_epoch = int(np.argmin(hist_df["val_loss"].to_numpy())) + 1
-summary = {
-    "epochs_run": int(len(hist_df)),
-    "best_epoch": best_epoch,
-    "best_val_loss": float(hist_df.loc[best_epoch, "val_loss"]),
-    "val_accuracy_at_best_epoch": float(hist_df.loc[best_epoch, "val_accuracy"]),
-    "train_accuracy_at_best_epoch": float(hist_df.loc[best_epoch, "accuracy"]),
-    "training_images_per_class": image_counts,  # inkl. 20 % Validierung
-    "class_weights": {c: round(class_weight[i], 4) for i, c in enumerate(class_names)}
-    if class_weight
-    else None,
-    "seed": config.SEED,
-    "python": platform.python_version(),
-    "tensorflow": tf.__version__,
-    "keras": keras.__version__,
-}
-save_json(summary, SUMMARY_PATH)
+config.HISTORY_CSV.parent.mkdir(parents=True, exist_ok=True)
+hist_df.to_csv(config.HISTORY_CSV)
+save_json(summary, config.TRAINING_SUMMARY_JSON)
 
 print("\nTraining abgeschlossen.")
-print(f"Beste Epoche (minimaler val_loss): {best_epoch} von {len(hist_df)}")
+print(f"Bilder pro Klasse: {summary['training_images_per_class']}")
+print(f"Klassengewichte:   {summary['class_weights']}")
+print(f"Beste Epoche (minimaler val_loss): {summary['best_epoch']} von {summary['epochs_run']}")
 print(f"val_loss: {summary['best_val_loss']:.4f}, val_accuracy: {summary['val_accuracy_at_best_epoch']:.4f}")
-print(f"Modell gespeichert:          {MODEL_SAVE_PATH}")
-print(f"Trainingsverlauf gespeichert: {HISTORY_SAVE_PATH}")
-print(f"Zusammenfassung gespeichert:  {SUMMARY_PATH}")
+print(f"Modell gespeichert:           {config.MODEL_PATH}")
+print(f"Trainingsverlauf gespeichert: {config.HISTORY_CSV}")
+print(f"Zusammenfassung gespeichert:  {config.TRAINING_SUMMARY_JSON}")
