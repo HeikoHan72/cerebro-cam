@@ -11,6 +11,8 @@ authors:
   - family-names: Han
     given-names: Heiko
 repository-code: "https://github.com/HeikoHan72/cerebro-cam"
+version: 1.0.0
+date-released: 2026-10-26
 license: MIT
 keywords:
   - deep-learning
